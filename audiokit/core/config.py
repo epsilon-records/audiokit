@@ -34,8 +34,10 @@ class Config:
         
         # Pinecone configuration
         self.pinecone_api_key = self.get("PINECONE_API_KEY")
-        self.pinecone_environment = self.get("PINECONE_ENVIRONMENT", "us-west1-gcp")
-        self.pinecone_index_name = self.get("PINECONE_INDEX_NAME", "audiokit-index")
+        logger.debug(f"Pinecone API key: {'*' * 8}{self.pinecone_api_key[-4:]}" if self.pinecone_api_key else "No API key found")
+        self.pinecone_index_name = self.get("PINECONE_INDEX_NAME", "audiokit-brain")
+        self.pinecone_dimension = int(self.get("PINECONE_DIMENSION", "1536"))
+        self.pinecone_metric = self.get("PINECONE_METRIC", "cosine")
         
         # Create necessary directories
         self._setup_directories()

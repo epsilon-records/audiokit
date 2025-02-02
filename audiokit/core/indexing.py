@@ -14,7 +14,7 @@ from llama_index.core import VectorStoreIndex, Document, StorageContext
 from llama_index.vector_stores.pinecone import PineconeVectorStore
 
 from .logging import get_logger
-from .exceptions import IndexingError
+from .exceptions import IndexingError, ConfigurationError
 from .config import config
 
 logger = get_logger(__name__)
@@ -25,10 +25,12 @@ class AudioIndex:
     def __init__(self):
         """Initialize the audio index."""
         try:
+            if not config.pinecone_api_key:
+                raise ConfigurationError("Pinecone API key is not configured")
+            
             # Initialize Pinecone vector store through LlamaIndex
             vector_store = PineconeVectorStore(
                 api_key=config.pinecone_api_key,
-                environment=config.pinecone_environment,
                 index_name=config.pinecone_index_name
             )
             
@@ -44,6 +46,9 @@ class AudioIndex:
             
             logger.info("Audio index initialized successfully")
             
+        except ConfigurationError as e:
+            logger.error("Configuration error: {}", str(e))
+            raise
         except Exception as e:
             logger.exception("Failed to initialize audio index")
             raise IndexingError("Index initialization failed") from e
