@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 
 from loguru import logger
+from .config import config
 
 # Remove default handler
 logger.remove()
@@ -92,3 +93,8 @@ def handle_exception(exc_type, exc_value, exc_traceback):
 
 # Install global exception handler
 sys.excepthook = handle_exception 
+
+def setup_logging():
+    log_level = config.get("AUDIOKIT_LOG_LEVEL", "INFO")
+    log_file = config.get("AUDIOKIT_LOG_FILE")
+    # ... rest of the logging setup ... 

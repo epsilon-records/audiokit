@@ -27,4 +27,8 @@ class ModelError(AudioKitError):
 
 class ConfigurationError(AudioKitError):
     """Raised when there are configuration issues."""
+    pass
+
+class IndexingError(AudioKitError):
+    """Raised when there are issues with audio indexing and search operations."""
     pass 

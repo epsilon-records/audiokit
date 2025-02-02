@@ -8,8 +8,12 @@ Configuration management and environment settings.
 import os
 from pathlib import Path
 from typing import Optional, Dict, Any
+from dotenv import load_dotenv
 
 from .logging import get_logger
+
+# Load environment variables from .env file
+load_dotenv()
 
 logger = get_logger(__name__)
 
@@ -18,15 +22,15 @@ class Config:
     
     def __init__(self):
         """Initialize configuration with environment variables."""
-        self.log_level = os.getenv("AUDIOKIT_LOG_LEVEL", "INFO")
-        self.log_file = os.getenv("AUDIOKIT_LOG_FILE")
-        self.models_dir = os.getenv("AUDIOKIT_MODELS_DIR", "models")
-        self.output_dir = os.getenv("AUDIOKIT_OUTPUT_DIR", "output")
-        self.temp_dir = os.getenv("AUDIOKIT_TEMP_DIR", "temp")
+        self.log_level = self.get("AUDIOKIT_LOG_LEVEL", "INFO")
+        self.log_file = self.get("AUDIOKIT_LOG_FILE")
+        self.models_dir = self.get("AUDIOKIT_MODELS_DIR", "models")
+        self.output_dir = self.get("AUDIOKIT_OUTPUT_DIR", "output")
+        self.temp_dir = self.get("AUDIOKIT_TEMP_DIR", "temp")
         
         # API credentials
-        self.soundcharts_app_id = os.getenv("SOUNDCHARTS_APP_ID")
-        self.soundcharts_api_key = os.getenv("SOUNDCHARTS_API_KEY")
+        self.soundcharts_app_id = self.get("SOUNDCHARTS_APP_ID")
+        self.soundcharts_api_key = self.get("SOUNDCHARTS_API_KEY")
         
         # Create necessary directories
         self._setup_directories()
@@ -61,6 +65,17 @@ class Config:
             "output_dir": self.output_dir,
             "temp_dir": self.temp_dir
         }
+
+    @staticmethod
+    def get(key: str, default: Optional[str] = None) -> Optional[str]:
+        """Get configuration value from environment."""
+        return os.getenv(key, default)
+    
+    @staticmethod
+    def get_bool(key: str, default: bool = False) -> bool:
+        """Get boolean configuration value."""
+        value = os.getenv(key, str(default)).lower()
+        return value in ('true', '1', 't', 'y', 'yes')
 
 # Global configuration instance
 config = Config() 

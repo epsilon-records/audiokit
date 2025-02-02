@@ -11,13 +11,14 @@ from pathlib import Path
 from datetime import datetime
 
 import pinecone
+from dotenv import load_dotenv
 
-# NEW: Top-level imports for llama_index 0.12.x
-from llama_index import VectorStoreIndex, Document, StorageContext
-from llama_index.vector_stores import PineconeVectorStore
+from llama_index.core import VectorStoreIndex, Document, StorageContext
+from llama_index.vector_stores.pinecone import PineconeVectorStore
 
 from .logging import get_logger
 from .exceptions import IndexingError
+from .config import config
 
 logger = get_logger(__name__)
 
@@ -29,8 +30,8 @@ class AudioIndex:
         try:
             # Initialize Pinecone
             pinecone.init(
-                api_key=os.getenv("PINECONE_API_KEY"),
-                environment=os.getenv("PINECONE_ENV")
+                api_key=config.get("PINECONE_API_KEY"),
+                environment=config.get("PINECONE_ENV")
             )
             
             # Get or create index
