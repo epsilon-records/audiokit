@@ -85,10 +85,10 @@ class AudioKit:
             ValidationError: If audio file is invalid
             AudioKitError: If analysis fails
         """
-        path = self._validate_audio_file(audio_path)
-        logger.log("ANALYSIS", f"Analyzing audio file: {path}")
-        
         try:
+            path = self._validate_audio_file(audio_path)
+            logger.log("ANALYSIS", f"Analyzing audio file: {path}")
+            
             with logger.contextualize(operation="analysis", file=path.name):
                 results = {
                     "bpm_key": self.analyzer.detect_bpm_key(str(path)),
@@ -149,7 +149,7 @@ class AudioKit:
             
             # Index processing results
             if results:
-                audio_index.index_analysis(
+                audio_index.index_data(
                     str(path),
                     {
                         "processing": results,
@@ -158,10 +158,14 @@ class AudioKit:
                             "stems": separate_stems,
                             "noise": reduce_noise
                         }
-                    }
+                    },
+                    "processing"
                 )
             
             return results
+        except Exception as e:
+            logger.exception("Audio processing failed")
+            raise AudioKitError("Audio processing failed") from e
 
     def generate_content(
         self,
@@ -191,15 +195,19 @@ class AudioKit:
             
             # Index generation results
             if audio_path and results:
-                audio_index.index_analysis(
+                audio_index.index_data(
                     audio_path,
                     {
                         "generated_content": results,
                         "generation_type": list(results.keys())
-                    }
+                    },
+                    "generation"
                 )
             
             return results
+        except Exception as e:
+            logger.exception("Content generation failed")
+            raise AudioKitError("Content generation failed") from e
 
     @logger.catch(reraise=True)
     def find_similar(
