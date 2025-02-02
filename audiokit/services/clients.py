@@ -4,7 +4,7 @@ External Service Clients
 Clients for external API integrations.
 """
 
-import requests
+import httpx
 from typing import Optional, Dict, Any
 
 from ..core.logging import get_logger
@@ -36,12 +36,12 @@ class SoundchartsClient:
         logger.info("Fetching song metadata for UUID: {}", song_uuid)
         
         try:
-            response = requests.get(url, headers=self.headers)
+            response = httpx.get(url, headers=self.headers)
             response.raise_for_status()
             data = response.json()
             logger.success("Successfully fetched song metadata")
             return data
-        except requests.exceptions.RequestException as e:
+        except httpx.exceptions.RequestException as e:
             logger.error("Failed to fetch song metadata: {}", str(e))
             return None
     
@@ -52,11 +52,11 @@ class SoundchartsClient:
         logger.info("Fetching playlist metadata for UUID: {}", playlist_uuid)
         
         try:
-            response = requests.get(url, headers=self.headers)
+            response = httpx.get(url, headers=self.headers)
             response.raise_for_status()
             data = response.json()
             logger.success("Successfully fetched playlist metadata")
             return data
-        except requests.exceptions.RequestException as e:
+        except httpx.exceptions.RequestException as e:
             logger.error("Failed to fetch playlist metadata: {}", str(e))
             return None 
