@@ -40,6 +40,7 @@ class Config:
         # OpenRouter configuration
         self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
         self.openrouter_model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4")
+        self.openrouter_base_url = "https://openrouter.ai/api/v1"
         
         # Create necessary directories
         self._setup_directories()

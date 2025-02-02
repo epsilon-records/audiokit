@@ -12,8 +12,8 @@ from datetime import datetime
 
 from llama_index.core import VectorStoreIndex, Document, StorageContext
 from llama_index.vector_stores.pinecone import PineconeVectorStore
-from llama_index.llms import OpenRouter
-from llama_index.embeddings import OpenRouterEmbedding
+from llama_index.llms import OpenAI
+from llama_index.embeddings import OpenAIEmbedding
 
 from .logging import get_logger
 from .exceptions import IndexingError, ConfigurationError
@@ -51,8 +51,17 @@ class AudioIndex:
             storage_context = StorageContext.from_defaults(vector_store=vector_store)
             
             logger.debug("Initializing vector store index")
-            llm = OpenRouter(api_key=config.openrouter_api_key, model=config.openrouter_model)
-            embed_model = OpenRouterEmbedding(api_key=config.openrouter_api_key, model=config.openrouter_model)
+            llm = OpenAI(
+                api_key=config.openrouter_api_key,
+                model=config.openrouter_model,
+                base_url=config.openrouter_base_url
+            )
+            
+            embed_model = OpenAIEmbedding(
+                api_key=config.openrouter_api_key,
+                model="text-embedding-ada-002",
+                base_url=config.openrouter_base_url
+            )
             
             self.index = VectorStoreIndex.from_documents(
                 documents=[],
