@@ -57,6 +57,8 @@ def setup_logging(level=None, log_file=None):
 class AudioKit:
     """Main AudioKit class providing access to all audio processing features."""
     
+    disable_progress = False  # Add this class variable
+    
     def __init__(self, log_level=logging.INFO, log_file=None):
         """Initialize AudioKit with default configuration."""
         self._setup_logging(level=log_level, log_file=log_file)
@@ -124,6 +126,9 @@ class AudioKit:
                 
                 return results
                 
+        except ValidationError:
+            # Re-raise ValidationError directly
+            raise
         except Exception as e:
             logger.opt(exception=True).error("Audio analysis failed")
             raise AudioKitError("Audio analysis failed") from e
@@ -135,6 +140,7 @@ class AudioKit:
             api_key=os.getenv("SOUNDCHARTS_API_KEY")
         )
     
+    @logger.catch(reraise=True)
     def process_audio(
         self,
         audio_path: str,
@@ -157,20 +163,29 @@ class AudioKit:
             dict: Paths to processed audio files
         """
         try:
+            logger.info("Starting audio processing for: %s", audio_path)
             results = {}
             path = self._validate_audio_file(audio_path)
+            logger.debug("Validated audio file: %s", path)
             
             if extract_vocals:
+                logger.info("Extracting vocals")
                 results["vocals"] = self.processor.extract_vocals(audio_path)
+                logger.debug("Vocals extracted to: %s", results["vocals"])
             
             if separate_stems:
+                logger.info("Separating stems")
                 results["stems"] = self.processor.separate_stems(audio_path, output_dir)
+                logger.debug("Stems separated to: %s", results["stems"])
             
             if reduce_noise:
+                logger.info("Reducing noise")
                 results["cleaned"] = self.processor.reduce_noise(audio_path)
+                logger.debug("Noise reduced, output: %s", results["cleaned"])
             
             # Index processing results
             if results:
+                logger.info("Indexing processing results")
                 audio_index.index_data(
                     str(path),
                     {
@@ -184,9 +199,10 @@ class AudioKit:
                     "processing"
                 )
             
+            logger.info("Audio processing completed successfully")
             return results
         except Exception as e:
-            logger.exception("Audio processing failed")
+            logger.exception("Audio processing failed: %s", str(e))
             raise AudioKitError("Audio processing failed") from e
 
     def generate_content(

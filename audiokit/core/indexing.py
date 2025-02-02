@@ -125,30 +125,31 @@ class AudioIndex:
         n_results: int = 5,
         filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
-        """
-        Search indexed audio data.
-        """
+        """Search audio analyses with natural language."""
         try:
-            # Execute search
-            response = self.index.as_query_engine().query(
-                query,
+            logger.info("Searching audio with query: {}", query)
+            
+            # Create query engine with proper parameters
+            query_engine = self.index.as_query_engine(
                 similarity_top_k=n_results,
                 filters=filters
             )
             
-            # Format results
-            results = []
-            for node in response.source_nodes:
-                results.append({
-                    "score": node.score,
-                    "content": json.loads(node.text),
-                    "metadata": node.metadata
-                })
+            response = query_engine.query(query)
             
-            return results
+            if not response:
+                logger.warning("No results found for query: {}", query)
+                return []
+            
+            return [{
+                "content": node.node.get_content(),
+                "metadata": node.node.metadata,
+                "score": node.score
+            } for node in response.source_nodes]
             
         except Exception as e:
-            logger.exception("Search failed")
+            logger.error("Search failed")
+            logger.opt(exception=True).debug("Search error details")
             raise IndexingError("Search failed") from e
     
     def similar_audio(

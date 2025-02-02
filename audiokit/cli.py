@@ -20,6 +20,7 @@ import json
 
 from . import ak
 from .core.logging import get_logger, setup_logging
+from .core.config import config
 
 # Initialize logger
 logger = get_logger(__name__)
@@ -62,8 +63,14 @@ def analyze(
     )
 ):
     """Analyze an audio file and display comprehensive results."""
-    with console.status("[bold green]Analyzing audio...") as status:
-        try:
+    from audiokit import ak  # Import here to access disable_progress
+    
+    # Temporarily disable progress if needed
+    original_progress_setting = ak.disable_progress
+    ak.disable_progress = True
+    
+    try:
+        with console.status("[bold green]Analyzing audio...") as status:
             logger.info("Starting analysis of: {}", audio_path)
             results = ak.analyze_audio(str(audio_path))
             
@@ -72,26 +79,40 @@ def analyze(
                 console.print_json(data=results)
                 return
             
-            # Create rich table output
-            logger.debug("Creating results table")
-            table = Table(title=f"Analysis Results: {audio_path.name}")
-            table.add_column("Feature", style="cyan")
-            table.add_column("Value", style="green")
+            # Format the output using Rich
+            console.print(f"\n[bold green]Analysis Results: {audio_path.name}[/bold green]")
             
-            for category, details in results.items():
-                if isinstance(details, dict):
-                    for key, value in details.items():
-                        table.add_row(f"{category.upper()} - {key}", str(value))
-                else:
-                    table.add_row(category.upper(), str(details))
+            # Create table for BPM/Key
+            bpm_key_table = Table(title="BPM & Key", show_header=True, header_style="bold magenta")
+            bpm_key_table.add_column("Feature", style="dim")
+            bpm_key_table.add_column("Value")
+            bpm_key_table.add_row("BPM", str(results["bpm_key"]["bpm"]))
+            bpm_key_table.add_row("Key", results["bpm_key"]["key"])
             
-            console.print(table)
+            # Create table for Genre/Mood
+            genre_table = Table(title="Genre & Mood", show_header=True, header_style="bold blue")
+            genre_table.add_column("Feature", style="dim")
+            genre_table.add_column("Value")
+            genre_table.add_row("Genre", results["genre"]["genre"])
+            genre_table.add_row("Mood", results["genre"]["mood"])
+            
+            # Create table for Instruments
+            instruments_table = Table(title="Instruments", show_header=True, header_style="bold yellow")
+            instruments_table.add_column("Instrument", style="dim")
+            instruments_table.add_column("Confidence")
+            for instrument, confidence in results["instruments"].items():
+                instruments_table.add_row(instrument, f"{confidence:.2f}")
+            
+            # Print all tables
+            console.print(bpm_key_table)
+            console.print(genre_table)
+            console.print(instruments_table)
+            
             logger.success("Analysis complete")
             
-        except Exception as e:
-            logger.exception("Analysis failed")
-            console.print(f"[red]Error analyzing audio:[/red] {str(e)}")
-            raise typer.Exit(1)
+    finally:
+        # Restore original progress setting
+        ak.disable_progress = original_progress_setting
 
 @app.command()
 @logger.catch(reraise=True)
@@ -338,7 +359,9 @@ def similar(
 @app.callback()
 def main():
     """AudioKit CLI - AI-powered audio processing toolkit."""
-    setup_cli()
+    # Setup logging with default configuration
+    setup_logging()
+    logger.info("AudioKit CLI initialized")
 
 if __name__ == "__main__":
     app()

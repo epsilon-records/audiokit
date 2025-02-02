@@ -11,6 +11,9 @@ from typing import Optional, Dict, Any
 
 from loguru import logger
 
+# Add this at the top of the file, after imports
+logger.level("ANALYSIS", no=25, color="<blue>", icon="📊")
+
 # Remove default handler
 logger.remove()
 
@@ -85,7 +88,13 @@ def handle_exception(exc_type, exc_value, exc_traceback):
 # Install global exception handler
 sys.excepthook = handle_exception 
 
+# Keep the import but handle potential circular import
+try:
+    from .config import config
+except ImportError:
+    config = None  # Fallback for when config isn't available yet
+
 def setup_logging():
-    log_level = config.get("AUDIOKIT_LOG_LEVEL", "INFO")
-    log_file = config.get("AUDIOKIT_LOG_FILE")
+    log_level = "INFO" if config is None else config.get("AUDIOKIT_LOG_LEVEL", "INFO")
+    log_file = None if config is None else config.get("AUDIOKIT_LOG_FILE")
     # ... rest of the logging setup ... 

@@ -8,14 +8,9 @@ Configuration management and environment settings.
 import os
 from pathlib import Path
 from typing import Optional, Dict, Any
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
 
 # Import logger after other imports to avoid circular dependency
-from .logging import get_logger
-logger = get_logger(__name__)
+# from .logging import get_logger
 
 class Config:
     """Global configuration settings."""
@@ -34,24 +29,31 @@ class Config:
         
         # Pinecone configuration
         self.pinecone_api_key = self.get("PINECONE_API_KEY")
-        logger.debug(f"Pinecone API key: {'*' * 8}{self.pinecone_api_key[-4:]}" if self.pinecone_api_key else "No API key found")
+        # logger.debug(f"Pinecone API key: {'*' * 8}{self.pinecone_api_key[-4:]}" if self.pinecone_api_key else "No API key found")
         self.pinecone_index_name = self.get("PINECONE_INDEX_NAME")
         
         # OpenRouter configuration
-        self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+        self.openrouter_api_key = self.get("OPENROUTER_API_KEY")
         if not self.openrouter_api_key:
             raise ValueError("OpenRouter API key is required. Set OPENROUTER_API_KEY in .env")
         
         # Create necessary directories
         self._setup_directories()
-        logger.debug("Configuration initialized")
+        # logger.debug("Configuration initialized")
+        
+        # Initialize configuration values
+        self._config = {}
+        
+        # Import and setup logging after initialization
+        from .logging import setup_logging
+        setup_logging()
     
     def _setup_directories(self):
         """Create necessary directories if they don't exist."""
         for dir_path in [self.models_dir, self.output_dir, self.temp_dir]:
             path = Path(dir_path)
             if not path.exists():
-                logger.debug("Creating directory: {}", path)
+                # logger.debug("Creating directory: {}", path)
                 path.mkdir(parents=True, exist_ok=True)
     
     def get_model_path(self, model_name: str) -> Path:
@@ -87,5 +89,5 @@ class Config:
         value = os.getenv(key, str(default)).lower()
         return value in ('true', '1', 't', 'y', 'yes')
 
-# Global configuration instance
+# Create global configuration instance
 config = Config() 
