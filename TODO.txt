@@ -19,6 +19,17 @@ Priority 1 - Core Functionality & Testing
 
 Priority 2 - Essential Features
 -----------------------------
+[ ] Enhance Vector Search & RAG
+    - Add batch indexing capabilities
+    - Implement caching for frequent queries
+    - Add advanced search filters and aggregations
+    - Improve semantic search with custom embeddings
+    - Add metadata-based filtering
+    - Implement automatic reindexing
+[ ] Add Real-time Processing Features
+    - Live audio input processing
+    - Real-time effects chain
+    - Streaming output support
 [ ] Add Audio Effects Chain
     - Basic effects (EQ, compression, reverb)
     - Chain configuration
@@ -65,10 +76,14 @@ Completed Tasks
 [✓] Implement basic CLI interface
 [✓] Add batch processing support
 [✓] Restructure project for better organization
+[✓] Add Loguru logging integration
+[✓] Add LlamaIndex integration for RAG
 
 Notes
 -----
 - Keep implementation simple initially
 - Add tests before moving to next feature
 - Maintain backward compatibility
-- Document all changes 
+- Document all changes
+- Continuously update vector database with new data
+- Focus on improving RAG quality over time 

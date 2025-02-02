@@ -11,7 +11,7 @@ Basic usage:
 """
 
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from pathlib import Path
 
 from .ai.analysis import AudioAnalyzer
@@ -20,6 +20,7 @@ from .ai.generation import AudioGenerator
 from .services.clients import SoundchartsClient
 from .core.exceptions import AudioKitError, ValidationError
 from .core.logging import setup_logging, get_logger
+from .core.indexing import audio_index
 
 # Get module logger
 logger = get_logger(__name__)
@@ -95,6 +96,10 @@ class AudioKit:
                     "instruments": self.analyzer.identify_instruments(str(path))
                 }
                 logger.debug("Analysis results: {}", results)
+                
+                # Index with versioning
+                audio_index.index_data(str(path), results, "analysis")
+                
                 return results
                 
         except Exception as e:
@@ -129,19 +134,35 @@ class AudioKit:
         Returns:
             dict: Paths to processed audio files
         """
-        results = {}
-        
-        if extract_vocals:
-            results["vocals"] = self.processor.extract_vocals(audio_path)
-        
-        if separate_stems:
-            results["stems"] = self.processor.separate_stems(audio_path, output_dir)
-        
-        if reduce_noise:
-            results["cleaned"] = self.processor.reduce_noise(audio_path)
+        try:
+            results = {}
+            path = self._validate_audio_file(audio_path)
             
-        return results
-    
+            if extract_vocals:
+                results["vocals"] = self.processor.extract_vocals(audio_path)
+            
+            if separate_stems:
+                results["stems"] = self.processor.separate_stems(audio_path, output_dir)
+            
+            if reduce_noise:
+                results["cleaned"] = self.processor.reduce_noise(audio_path)
+            
+            # Index processing results
+            if results:
+                audio_index.index_analysis(
+                    str(path),
+                    {
+                        "processing": results,
+                        "operations": {
+                            "vocals": extract_vocals,
+                            "stems": separate_stems,
+                            "noise": reduce_noise
+                        }
+                    }
+                )
+            
+            return results
+
     def generate_content(
         self,
         audio_path: Optional[str] = None,
@@ -157,17 +178,52 @@ class AudioKit:
         Returns:
             dict: Generated content details
         """
-        results = {}
+        try:
+            results = {}
+            
+            if audio_path:
+                results["moodboard"] = self.generator.generate_moodboard(audio_path)
+                
+            if instrument_description:
+                results["instrument"] = self.generator.generate_instrument(
+                    instrument_description
+                )
+            
+            # Index generation results
+            if audio_path and results:
+                audio_index.index_analysis(
+                    audio_path,
+                    {
+                        "generated_content": results,
+                        "generation_type": list(results.keys())
+                    }
+                )
+            
+            return results
+
+    @logger.catch(reraise=True)
+    def find_similar(
+        self,
+        audio_path: str,
+        n_results: int = 5
+    ) -> List[Dict[str, Any]]:
+        """Find similar audio files based on analysis."""
+        path = self._validate_audio_file(audio_path)
+        logger.info("Finding similar audio to: {}", path)
         
-        if audio_path:
-            results["moodboard"] = self.generator.generate_moodboard(audio_path)
-            
-        if instrument_description:
-            results["instrument"] = self.generator.generate_instrument(
-                instrument_description
-            )
-            
-        return results
+        return audio_index.similar_audio(str(path), n_results)
+    
+    @logger.catch(reraise=True)
+    def search_audio(
+        self,
+        query: str,
+        n_results: int = 5,
+        filters: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """Search audio analyses with natural language."""
+        logger.info("Searching audio with query: {}", query)
+        
+        return audio_index.search(query, n_results, filters)
 
 # Create global instance
 ak = AudioKit()

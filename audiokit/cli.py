@@ -16,6 +16,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress
 from typing import Optional, List
+import json
 
 from . import ak
 from .core.logging import get_logger, setup_logging
@@ -234,6 +235,105 @@ def batch(
             except Exception as e:
                 logger.exception("Failed to process file")
                 console.print(f"[red]Error processing {audio_file.name}:[/red] {str(e)}")
+
+@app.command()
+@logger.catch(reraise=True)
+def search(
+    query: str = typer.Argument(
+        ...,
+        help="Natural language search query"
+    ),
+    n_results: int = typer.Option(
+        5,
+        "--limit", "-n",
+        help="Number of results to return"
+    ),
+    output_format: str = typer.Option(
+        "table",
+        "--format", "-f",
+        help="Output format (table/json)"
+    )
+):
+    """Search audio analyses with natural language."""
+    with console.status("[bold green]Searching..."):
+        try:
+            logger.info("Executing search query: {}", query)
+            results = ak.search_audio(query, n_results)
+            
+            if output_format == "json":
+                console.print_json(data=results)
+                return
+            
+            # Create results table
+            table = Table(title="Search Results")
+            table.add_column("Score", style="cyan", justify="right")
+            table.add_column("File", style="blue")
+            table.add_column("Details", style="green")
+            
+            for result in results:
+                score = f"{result['score']:.2f}"
+                file = result['metadata']['file_name']
+                details = json.dumps(result['content'], indent=2)
+                table.add_row(score, file, details)
+            
+            console.print(table)
+            logger.success("Search complete")
+            
+        except Exception as e:
+            logger.exception("Search failed")
+            console.print(f"[red]Error searching:[/red] {str(e)}")
+            raise typer.Exit(1)
+
+@app.command()
+@logger.catch(reraise=True)
+def similar(
+    audio_path: Path = typer.Argument(
+        ...,
+        help="Path to reference audio file",
+        exists=True,
+        file_okay=True,
+        dir_okay=False
+    ),
+    n_results: int = typer.Option(
+        5,
+        "--limit", "-n",
+        help="Number of similar files to find"
+    ),
+    output_format: str = typer.Option(
+        "table",
+        "--format", "-f",
+        help="Output format (table/json)"
+    )
+):
+    """Find similar audio files."""
+    with console.status("[bold green]Finding similar audio..."):
+        try:
+            logger.info("Finding similar audio to: {}", audio_path)
+            results = ak.find_similar(str(audio_path), n_results)
+            
+            if output_format == "json":
+                console.print_json(data=results)
+                return
+            
+            # Create results table
+            table = Table(title=f"Similar to: {audio_path.name}")
+            table.add_column("Similarity", style="cyan", justify="right")
+            table.add_column("File", style="blue")
+            table.add_column("Analysis", style="green")
+            
+            for result in results:
+                similarity = f"{result['score']:.2f}"
+                file = result['metadata']['file_name']
+                analysis = json.dumps(result['content'], indent=2)
+                table.add_row(similarity, file, analysis)
+            
+            console.print(table)
+            logger.success("Similar audio search complete")
+            
+        except Exception as e:
+            logger.exception("Similar audio search failed")
+            console.print(f"[red]Error finding similar audio:[/red] {str(e)}")
+            raise typer.Exit(1)
 
 @app.callback()
 def main():
