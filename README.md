@@ -43,7 +43,6 @@ print(features)
 # Process audio
 results = ak.process_audio("sample.wav", extract_vocals=True)
 ```
-
 ## Documentation
 
 Full documentation available at: [https://epsilon-records.github.io/audiokit](https://epsilon-records.github.io/audiokit)
@@ -55,3 +54,4 @@ We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for 
 ## License
 
 MIT License - See [LICENSE](LICENSE) for details.
+
