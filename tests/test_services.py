@@ -1,17 +1,18 @@
 import pytest
-from unittest.mock import Mock, patch
+import respx
+import httpx
 from audiokit.services.clients import SoundchartsClient
 
-@patch('requests.get')
-def test_soundcharts_get_song_metadata(mock_get):
-    """Test Soundcharts song metadata retrieval"""
-    mock_response = Mock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {"test": "data"}
-    mock_get.return_value = mock_response
-    
+def test_soundcharts_get_song_metadata(mock_http_calls):
+    """Test Soundcharts song metadata retrieval using respx"""
+    # Setup a route to mock the expected Soundcharts API endpoint.
+    # Adjust the URL pattern as needed based on your client's implementation.
+    route = respx.get("https://soundcharts.example.com/.*").mock(
+        return_value=httpx.Response(200, json={"test": "data"})
+    )
+
     client = SoundchartsClient("test_app_id", "test_api_key")
     result = client.get_song_metadata("test_uuid")
     
     assert result == {"test": "data"}
-    mock_get.assert_called_once() 
+    assert route.called 

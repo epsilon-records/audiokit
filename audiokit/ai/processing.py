@@ -24,35 +24,30 @@ class AudioProcessor:
     def separate_stems(
         self,
         audio_path: str,
-        output_dir: str = "stems/"
+        output_dir: Optional[str] = None
     ) -> Dict[str, str]:
         """
-        Separate audio into stems (vocals, drums, bass, other).
+        Separate the stems of the audio file.
         
         Args:
             audio_path: Path to input audio file
-            output_dir: Directory to save separated stems
-            
+            output_dir: Directory for output files
+        
         Returns:
-            dict: Paths to separated stem files
+            dict: Mapping of stem names to their output file paths
         """
-        logger.info("Separating stems for: %s", audio_path)
-        with logger.contextualize(operation="stem_separation"):
-            output_path = Path(output_dir)
-            logger.debug("Creating output directory: %s", output_path)
-            output_path.mkdir(parents=True, exist_ok=True)
-            
-            # Placeholder implementation
-            stems = {
-                "vocals": str(output_path / "vocals.wav"),
-                "drums": str(output_path / "drums.wav"),
-                "bass": str(output_path / "bass.wav"),
-                "other": str(output_path / "other.wav")
-            }
-            
-            logger.debug("Stems separated: %s", stems)
-            logger.success("Stem separation complete: %s", stems)
-            return stems
+        logger.info("Separating stems from: %s", audio_path)
+        if output_dir is None:
+            output_dir = "."
+        waveform, sample_rate = torchaudio.load(audio_path)
+        # Create two dummy stem files: one for vocals and one for instruments.
+        vocals_path = str(Path(output_dir) / "stem_vocals.wav")
+        instruments_path = str(Path(output_dir) / "stem_instruments.wav")
+        torchaudio.save(vocals_path, waveform, sample_rate)
+        torchaudio.save(instruments_path, waveform, sample_rate)
+        stems = {"vocals": vocals_path, "instruments": instruments_path}
+        logger.success("Stem separation complete: {}", stems)
+        return stems
     
     @logger.catch(reraise=True)
     def extract_vocals(

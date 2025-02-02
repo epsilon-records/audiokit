@@ -5,6 +5,8 @@ import soundfile as sf
 import os
 from dotenv import load_dotenv
 from audiokit.core.logging import get_logger
+import respx
+import httpx
 
 logger = get_logger(__name__)
 
@@ -54,4 +56,21 @@ def change_to_temp_dir(tmp_path, monkeypatch):
     generated_dir = tmp_path / "generated_audio"
     generated_dir.mkdir()
     monkeypatch.chdir(generated_dir)
-    print("Current working directory changed to:", os.getcwd()) 
+    print("Current working directory changed to:", os.getcwd())
+
+@pytest.fixture(autouse=True)
+def mock_http_calls(request):
+    """
+    Automatically mock external HTTP calls using respx unless the test is marked as integration.
+    To run a live HTTP call (e.g. for integration tests), mark the test with @pytest.mark.integration.
+    """
+    if request.node.get_closest_marker("integration"):
+        # For integration tests, do not mock HTTP calls.
+        yield
+    else:
+        with respx.mock(assert_all_called=False) as respx_mock:
+            # Example: Default mock for OpenRouter API endpoint.
+            respx_mock.post("https://openrouter.ai/api/v1/completions").mock(
+                return_value=httpx.Response(200, json={"dummy": "response"})
+            )
+            yield respx_mock 
