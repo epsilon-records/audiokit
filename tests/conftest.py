@@ -42,4 +42,16 @@ def setup_test_env():
     os.environ["AUDIOKIT_LOG_LEVEL"] = "DEBUG"  # Ensure DEBUG level
     
     # Initialize logging
-    get_logger() 
+    get_logger()
+
+@pytest.fixture(autouse=True)
+def change_to_temp_dir(tmp_path, monkeypatch):
+    """
+    Automatically change the current working directory to a temporary subdirectory
+    within the test's tmp_path. This ensures that any files (e.g. .wav files) generated
+    by the tests using relative paths are created in this folder rather than in the project root.
+    """
+    generated_dir = tmp_path / "generated_audio"
+    generated_dir.mkdir()
+    monkeypatch.chdir(generated_dir)
+    print("Current working directory changed to:", os.getcwd()) 

@@ -7,7 +7,6 @@ import os
 from time import time, sleep
 from rich.console import Console  # import Rich's Console to enable recording
 import re
-import io
 
 # Use the package logger consistently
 logger = get_logger(__name__)
@@ -23,38 +22,35 @@ def setup_config():
     os.environ.pop("AUDIOKIT_LOG_LEVEL", None)
     os.environ.pop("AUDIOKIT_LOG_FILE", None)
 
+@pytest.fixture(autouse=True)
+def patch_console(monkeypatch):
+    """
+    Monkeypatch the global console in audiokit.cli to use a recording Console.
+    """
+    import audiokit.cli as cli  # import the module that created the console
+    recording_console = Console(force_terminal=True, record=True)
+    monkeypatch.setattr(cli, "console", recording_console)
+    return recording_console
+
 runner = CliRunner()
-
-class AccumulatingStream(io.StringIO):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.accumulated = []
-
-    def write(self, s):
-        self.accumulated.append(s)
-        return super().write(s)
-
-    def get_accumulated(self):
-        return ''.join(self.accumulated)
 
 def strip_ansi(text: str) -> str:
     # Regular expression for ANSI escape sequences
     ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
     return ansi_escape.sub('', text)
 
-def test_cli_analyze(sample_audio_path):
+def test_cli_analyze(sample_audio_path, patch_console):
     """Test CLI analyze command"""
     logger.info("Testing CLI analyze command")
     
-    # Create an accumulating stream and override the runner's output stream method.
-    accum_stream = AccumulatingStream()
-    original_method = runner._get_output_stream
-    runner._get_output_stream = lambda: accum_stream
     result = runner.invoke(
         app, ["analyze", str(sample_audio_path)], catch_exceptions=False
     )
-    runner._get_output_stream = original_method
-    final_output = accum_stream.get_accumulated()
+    # Allow a brief pause to let all output be recorded.
+    sleep(0.2)
+    final_output = patch_console.export_text(clear=False)
+    if not final_output:
+        final_output = result.stdout
     
     logger.debug("CLI analyze command rendered output: {}", final_output)
     logger.debug("CLI analyze command exit code: {}", result.exit_code)
@@ -75,13 +71,9 @@ def test_cli_analyze(sample_audio_path):
     assert "0.85" in final_output_clean         # Guitar
     assert "0.90" in final_output_clean         # Drums
 
-def test_cli_process(sample_audio_path, tmp_path):
+def test_cli_process(sample_audio_path, tmp_path, patch_console):
     """Test CLI process command"""
     logger.info("Testing CLI process command")
-    # Create an accumulating stream and override the runner's output stream method.
-    accum_stream = AccumulatingStream()
-    original_method = runner._get_output_stream
-    runner._get_output_stream = lambda: accum_stream
     result = runner.invoke(
         app, [
             "process", 
@@ -91,8 +83,10 @@ def test_cli_process(sample_audio_path, tmp_path):
         ],
         catch_exceptions=False
     )
-    runner._get_output_stream = original_method
-    final_output = accum_stream.get_accumulated()
+    sleep(0.2)
+    final_output = patch_console.export_text(clear=False)
+    if not final_output:
+        final_output = result.stdout
     
     logger.debug("CLI process command rendered output: {}", final_output)
     logger.debug("CLI process command exit code: {}", result.exit_code)

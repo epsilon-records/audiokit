@@ -269,7 +269,7 @@ class AudioKit:
         """Search audio analyses with natural language."""
         logger.info("Searching audio with query: {}", query)
         
-        return audio_index.search(query, n_results, filters)
+        return audio_index.search_audio(query, n_results, filters)
 
 # Create global instance
 ak = AudioKit()
