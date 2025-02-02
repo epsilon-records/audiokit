@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 from datetime import datetime
 
-# Updated imports to avoid circular dependencies
+# Updated imports to use the correct package structure
 from llama_index.core import VectorStoreIndex, Document
 from llama_index.core.storage.storage_context import StorageContext
 from llama_index.vector_stores.pinecone import PineconeVectorStore
