@@ -21,7 +21,8 @@ def test_search_audio(sample_audio_path):
     results = ak.search_audio("test query")
     assert isinstance(results, list)
 
+@pytest.mark.integration
 def test_find_similar(sample_audio_path):
-    """Test finding similar audio"""
+    """Test finding similar audio via live Pinecone vector DB integration"""
     results = ak.find_similar(str(sample_audio_path))
     assert isinstance(results, list) 
