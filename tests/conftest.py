@@ -24,14 +24,6 @@ def log_api_keys():
     logger.info("Using OpenRouter API key: {}", config.openrouter_api_key)
     yield
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_openrouter():
-    """Setup OpenRouter configuration for tests."""
-    from audiokit.core.config import config
-    if not config.openrouter_api_key:
-        pytest.skip("OpenRouter API key is required for these tests")
-    yield
-
 @pytest.fixture
 def fixture_dir() -> Path:
     """Return path to test fixtures directory."""

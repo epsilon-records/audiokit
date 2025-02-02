@@ -10,14 +10,13 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 from datetime import datetime
 
-from llama_index.core import VectorStoreIndex, Document, StorageContext
+from llama_index.core import VectorStoreIndex, Document, StorageContext, Settings
 from llama_index.vector_stores.pinecone import PineconeVectorStore
-from llama_index.llms import OpenAI
-from llama_index.embeddings import OpenAIEmbedding
 
 from .logging import get_logger
 from .exceptions import IndexingError, ConfigurationError
 from .config import config
+from .openrouter_config import configure_openrouter
 
 logger = get_logger(__name__)
 
@@ -36,6 +35,13 @@ class AudioIndex:
             logger.debug(f"Using Pinecone index: {config.pinecone_index_name}")
             logger.debug("Initializing Pinecone vector store")
             
+            # Configure OpenRouter
+            llm, embed_model = configure_openrouter(config.openrouter_api_key)
+            
+            # Update LlamaIndex settings
+            Settings.llm = llm
+            Settings.embed_model = embed_model
+            
             # Initialize Pinecone vector store through LlamaIndex
             vector_store = PineconeVectorStore(
                 api_key=config.pinecone_api_key,
@@ -51,22 +57,10 @@ class AudioIndex:
             storage_context = StorageContext.from_defaults(vector_store=vector_store)
             
             logger.debug("Initializing vector store index")
-            llm = OpenAI(
-                api_key=config.openrouter_api_key,
-                model=config.openrouter_model,
-                base_url=config.openrouter_base_url
-            )
-            
-            embed_model = OpenAIEmbedding(
-                api_key=config.openrouter_api_key,
-                model="text-embedding-ada-002",
-                base_url=config.openrouter_base_url
-            )
-            
             self.index = VectorStoreIndex.from_documents(
-                documents=[],
-                llm=llm,
-                embed_model=embed_model
+                [],
+                storage_context=storage_context,
+                show_progress=True
             )
             
             logger.info("Audio index initialized successfully")
