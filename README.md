@@ -1,25 +1,57 @@
-
 # AudioKit SDK
 
-AudioKit SDK is an AI-driven toolkit for audio processing, featuring BPM/key detection, genre classification, and more.
+**AI-Powered Audio Processing Toolkit**
+
+AudioKit SDK is a comprehensive Python library for audio analysis, processing, and generation, powered by state-of-the-art AI models. Designed for developers and audio engineers, it provides a modular and scalable solution for working with audio data.
+
+## Key Features
+
+- **Audio Analysis**  
+  - BPM and Key Detection  
+  - Genre and Mood Classification  
+  - Instrument Identification  
+
+- **Audio Processing**  
+  - Stem Separation (Vocals, Drums, Bass, etc.)  
+  - Noise Reduction  
+  - Audio Enhancement  
+
+- **Content Generation**  
+  - Instrument Synthesis from Text Descriptions  
+  - Moodboard Generation from Audio  
+
+- **Advanced Features**  
+  - Vector Search and Retrieval-Augmented Generation (RAG)  
+  - Real-time Processing Capabilities  
+  - Batch Processing Support  
 
 ## Installation
 
 ```bash
-pip install -r requirements.txt
+pip install audiokit
 ```
 
-## Features
-- BPM and Key Detection
-- Genre and Mood Classification
-- Modular and Scalable
-
-## Usage
+## Quick Start
 
 ```python
-from audiokit.ai.bpm_key_detection import BPMKeyDetection
+from audiokit import ak
 
-detector = BPMKeyDetection()
-result = detector.predict("sample_song.wav")
-print(result)
+# Analyze audio
+features = ak.analyze_audio("sample.wav")
+print(features)
+
+# Process audio
+results = ak.process_audio("sample.wav", extract_vocals=True)
 ```
+
+## Documentation
+
+Full documentation available at: [https://epsilon-records.github.io/audiokit](https://epsilon-records.github.io/audiokit)
+
+## Contributing
+
+We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## License
+
+MIT License - See [LICENSE](LICENSE) for details.
