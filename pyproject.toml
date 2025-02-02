@@ -1,31 +1,70 @@
-[tool.poetry]
-name = "audiokit"
-version = "0.2.0"
-description = "AudioKit SDK for AI-driven audio processing."
-authors = ["Your Name <your.email@example.com>"]
-license = "MIT"
-
-[tool.poetry.dependencies]
-python = "^3.8"
-torch = "^2.0"
-torchaudio = "^2.0"
-onnxruntime = "^1.15"
-numpy = "^1.24"
-typer = "^0.9.0"
-
-[tool.poetry.scripts]
-ak = "audiokit.cli:app"
-
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.0"
-pytest-cov = "^4.0"
-soundfile = "^0.12"
+[project]
+name = "audiokit"
+version = "0.1.0"
+description = "Audio processing toolkit with AI-driven features"
+authors = [
+    { name="Your Name", email="your.email@example.com" }
+]
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "loguru>=0.7.0",
+    "torchaudio>=2.0.0",
+    "llama-index>=0.9.0",
+    "pinecone-client>=2.2.0",
+    "openai>=1.0.0",
+    "typer>=0.9.0",
+    "rich>=13.0.0"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.0.0",
+    "ruff>=0.1.0"
+]
+docs = [
+    "mkdocs>=1.4.0",
+    "mkdocs-material>=9.0.0",
+    "mkdocstrings[python]>=0.20.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/epsilon-records/audiokit"
+Documentation = "https://github.com/epsilon-records/audiokit/docs"
+Repository = "https://github.com/epsilon-records/audiokit"
+Issues = "https://github.com/epsilon-records/audiokit/issues"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+minversion = "7.0"
 addopts = "-v --cov=audiokit --cov-report=term-missing"
+testpaths = [
+    "tests",
+]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true

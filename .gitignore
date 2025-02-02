@@ -1,0 +1,6 @@
+# Python packaging
+audiokit.egg-info/
+dist/
+build/
+*.egg
+.eggs/ 
