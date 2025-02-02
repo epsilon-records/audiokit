@@ -12,6 +12,7 @@ from datetime import datetime
 
 from llama_index.core import VectorStoreIndex, Document, StorageContext
 from llama_index.vector_stores.pinecone import PineconeVectorStore
+from pinecone import Pinecone
 
 from .logging import get_logger
 from .exceptions import IndexingError, ConfigurationError
@@ -25,19 +26,34 @@ class AudioIndex:
     def __init__(self):
         """Initialize the audio index."""
         try:
+            logger.debug("Initializing AudioIndex")
+            
             if not config.pinecone_api_key:
+                logger.error("Pinecone API key is missing in configuration")
                 raise ConfigurationError("Pinecone API key is not configured")
+            
+            # Initialize Pinecone client
+            logger.debug("Initializing Pinecone client")
+            self.pinecone_client = Pinecone(
+                api_key=config.pinecone_api_key
+            )
+            
+            logger.debug(f"Using Pinecone index: {config.pinecone_index_name}")
+            logger.debug("Initializing Pinecone vector store")
             
             # Initialize Pinecone vector store through LlamaIndex
             vector_store = PineconeVectorStore(
-                api_key=config.pinecone_api_key,
-                index_name=config.pinecone_index_name
+                pinecone_index=self.pinecone_client.Index(config.pinecone_index_name),
+                add_sparse_vector=False,
+                tokenizer=None,
+                default_empty_query_vector=None,
+                text_key="text"
             )
             
-            # Create storage context
+            logger.debug("Creating storage context")
             storage_context = StorageContext.from_defaults(vector_store=vector_store)
             
-            # Initialize vector store index
+            logger.debug("Initializing vector store index")
             self.index = VectorStoreIndex.from_documents(
                 [],
                 storage_context=storage_context,
@@ -50,7 +66,9 @@ class AudioIndex:
             logger.error("Configuration error: {}", str(e))
             raise
         except Exception as e:
-            logger.exception("Failed to initialize audio index")
+            logger.exception("Failed to initialize audio index. Error details: %s", str(e))
+            logger.error("Pinecone API key used: %s", config.pinecone_api_key)
+            logger.error("Pinecone index name: %s", config.pinecone_index_name)
             raise IndexingError("Index initialization failed") from e
     
     def index_data(
