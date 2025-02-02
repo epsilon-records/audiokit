@@ -71,3 +71,6 @@ warn_unreachable = true
 
 [tool.poetry.scripts]
 audiokit = "audiokit.cli:app"
+
+[tool.poetry.plugins."audiokit.plugins"]
+ai_mastering = "audiokit.plugins.ai_mastering:AIMasteringPlugin"
