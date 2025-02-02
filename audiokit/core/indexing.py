@@ -10,9 +10,6 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 from datetime import datetime
 
-import pinecone
-from dotenv import load_dotenv
-
 from llama_index.core import VectorStoreIndex, Document, StorageContext
 from llama_index.vector_stores.pinecone import PineconeVectorStore
 
@@ -28,24 +25,12 @@ class AudioIndex:
     def __init__(self):
         """Initialize the audio index."""
         try:
-            # Initialize Pinecone
-            pinecone.init(
-                api_key=config.get("PINECONE_API_KEY"),
-                environment=config.get("PINECONE_ENV")
+            # Initialize Pinecone vector store through LlamaIndex
+            vector_store = PineconeVectorStore(
+                api_key=config.pinecone_api_key,
+                environment=config.pinecone_environment,
+                index_name=config.pinecone_index_name
             )
-            
-            # Get or create index
-            index_name = "audiokit"
-            if index_name not in pinecone.list_indexes():
-                pinecone.create_index(
-                    name=index_name,
-                    dimension=1536,  # Default for OpenAI embeddings
-                    metric="cosine"
-                )
-            
-            # Setup vector store
-            pinecone_index = pinecone.Index(index_name)
-            vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
             
             # Create storage context
             storage_context = StorageContext.from_defaults(vector_store=vector_store)
@@ -54,7 +39,7 @@ class AudioIndex:
             self.index = VectorStoreIndex.from_documents(
                 [],
                 storage_context=storage_context,
-                show_progress=True  # Show progress in the method
+                show_progress=True
             )
             
             logger.info("Audio index initialized successfully")

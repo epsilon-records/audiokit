@@ -10,10 +10,13 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 
 from loguru import logger
-from .config import config
 
 # Remove default handler
 logger.remove()
+
+def get_logger(name: str = None):
+    """Get a logger instance."""
+    return logger.bind(name=name)
 
 def setup_logging(
     log_level: str = "INFO",
@@ -65,18 +68,6 @@ def setup_logging(
             diagnose=True,
             enqueue=True
         )
-
-def get_logger(name: str) -> "logger":
-    """
-    Get a contextualized logger instance.
-    
-    Args:
-        name: Name of the module (usually __name__)
-        
-    Returns:
-        Loguru logger instance with context
-    """
-    return logger.bind(name=name)
 
 # Configure default exception handling
 @logger.catch(onerror=lambda _: sys.exit(1))

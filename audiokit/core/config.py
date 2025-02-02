@@ -10,11 +10,11 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 
-from .logging import get_logger
-
 # Load environment variables from .env file
 load_dotenv()
 
+# Import logger after other imports to avoid circular dependency
+from .logging import get_logger
 logger = get_logger(__name__)
 
 class Config:
@@ -31,6 +31,11 @@ class Config:
         # API credentials
         self.soundcharts_app_id = self.get("SOUNDCHARTS_APP_ID")
         self.soundcharts_api_key = self.get("SOUNDCHARTS_API_KEY")
+        
+        # Pinecone configuration
+        self.pinecone_api_key = self.get("PINECONE_API_KEY")
+        self.pinecone_environment = self.get("PINECONE_ENVIRONMENT", "us-west1-gcp")
+        self.pinecone_index_name = self.get("PINECONE_INDEX_NAME", "audiokit-index")
         
         # Create necessary directories
         self._setup_directories()
