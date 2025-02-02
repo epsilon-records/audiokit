@@ -37,6 +37,10 @@ class Config:
         logger.debug(f"Pinecone API key: {'*' * 8}{self.pinecone_api_key[-4:]}" if self.pinecone_api_key else "No API key found")
         self.pinecone_index_name = self.get("PINECONE_INDEX_NAME")
         
+        # OpenRouter configuration
+        self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+        self.openrouter_model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4")
+        
         # Create necessary directories
         self._setup_directories()
         logger.debug("Configuration initialized")

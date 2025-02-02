@@ -20,3 +20,22 @@ To trigger a manual build:
    PINECONE_INDEX_NAME=audiokit-brain
    ```
 3. Ensure the `.env` file is not committed to version control
+
+## Testing Requirements
+
+To run the tests, you'll need:
+
+1. OpenRouter API Key
+   - Create an account at https://openrouter.ai
+   - Generate an API key
+   - Add it to your `.env` file as `OPENROUTER_API_KEY`
+   - Choose a model and add it as `OPENROUTER_MODEL` (e.g., `openai/gpt-4`)
+
+2. Pinecone API Key
+   - Create an account at https://www.pinecone.io
+   - Generate an API key
+   - Add it to your `.env` file as `PINECONE_API_KEY`
+
+3. Create a Pinecone index
+   - Create an index in your Pinecone dashboard
+   - Add the index name to your `.env` file as `PINECONE_INDEX_NAME`

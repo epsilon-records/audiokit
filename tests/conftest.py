@@ -9,14 +9,28 @@ import os
 import pytest
 from pathlib import Path
 from dotenv import load_dotenv
+from loguru import logger
 
 # Load environment variables before any tests run
 load_dotenv()
 
 @pytest.fixture(scope="session", autouse=True)
-def load_env():
-    """Ensure environment variables are loaded for all tests."""
-    pass
+def log_api_keys():
+    """Log API keys used in tests."""
+    logger.debug("log_api_keys fixture is running")
+    from audiokit.core.config import config
+    logger.info("Using Pinecone API key: {}", config.pinecone_api_key)
+    logger.info("Using Pinecone index: {}", config.pinecone_index_name)
+    logger.info("Using OpenRouter API key: {}", config.openrouter_api_key)
+    yield
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_openrouter():
+    """Setup OpenRouter configuration for tests."""
+    from audiokit.core.config import config
+    if not config.openrouter_api_key:
+        pytest.skip("OpenRouter API key is required for these tests")
+    yield
 
 @pytest.fixture
 def fixture_dir() -> Path:

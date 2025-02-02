@@ -48,6 +48,8 @@ addopts = "-v --cov=audiokit --cov-report=term-missing"
 testpaths = [
     "tests",
 ]
+log_cli = true
+log_level = "INFO"
 
 [tool.mypy]
 python_version = "3.12"
