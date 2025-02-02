@@ -13,38 +13,60 @@ Basic usage:
 import os
 from typing import Dict, Any, Optional, List
 from pathlib import Path
+import logging
 
 from .ai.analysis import AudioAnalyzer
 from .ai.processing import AudioProcessor
 from .ai.generation import AudioGenerator
 from .services.clients import SoundchartsClient
 from .core.exceptions import AudioKitError, ValidationError
-from .core.logging import setup_logging, get_logger
+from .core.logging import get_logger
 from .core.indexing import audio_index
 
 # Get module logger
 logger = get_logger(__name__)
 
+def setup_logging(level=None, log_file=None):
+    """Configure logging for the package.
+    
+    Args:
+        level: Logging level (e.g., logging.INFO, logging.DEBUG)
+        log_file: Path to log file (optional)
+    """
+    logger = logging.getLogger('audiokit')
+    logger.setLevel(level or logging.INFO)
+    
+    # Create console handler
+    ch = logging.StreamHandler()
+    ch.setLevel(level or logging.INFO)
+    
+    # Create formatter and add it to the handlers
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    
+    # Add the handlers to the logger
+    logger.addHandler(ch)
+    
+    # Add file handler if log_file is specified
+    if log_file:
+        fh = logging.FileHandler(log_file)
+        fh.setLevel(level or logging.INFO)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+
 class AudioKit:
     """Main AudioKit class providing access to all audio processing features."""
     
-    def __init__(self):
+    def __init__(self, log_level=logging.INFO, log_file=None):
         """Initialize AudioKit with default configuration."""
-        self._setup_logging()
+        self._setup_logging(level=log_level, log_file=log_file)
         self._initialize_components()
         self._initialize_services()
         logger.success("AudioKit initialized successfully")  # Note: using success level
     
-    def _setup_logging(self):
+    def _setup_logging(self, level=None, log_file=None):
         """Configure logging based on environment."""
-        log_level = os.getenv("AUDIOKIT_LOG_LEVEL", "INFO")
-        log_file = os.getenv("AUDIOKIT_LOG_FILE")
-        
-        # Add custom logging levels if needed
-        logger.level("PROCESSING", no=25, color="<cyan>")
-        logger.level("ANALYSIS", no=24, color="<blue>")
-        
-        setup_logging(log_level=log_level, log_file=log_file)
+        setup_logging(level=level, log_file=log_file)
     
     @logger.catch(reraise=True)
     def _initialize_components(self):
@@ -239,6 +261,3 @@ ak = AudioKit()
 __all__ = ['ak', 'AudioKit']
 
 __version__ = "0.1.0"
-
-# Initialize logging
-setup_logging()

@@ -9,6 +9,11 @@ import pytest
 from pathlib import Path
 from audiokit.core.exceptions import AudioFileError, ValidationError
 from audiokit import AudioKit
+from tests.ai.test_analysis import (
+    test_bpm_key_detection,
+    test_genre_classification,
+    test_instrument_identification
+)
 
 def test_validate_audio_file_success(sample_audio_path):
     """Test successful audio file validation."""
@@ -18,11 +23,11 @@ def test_validate_audio_file_success(sample_audio_path):
     assert result.exists()
     assert result.suffix.lower() in ['.wav', '.mp3', '.flac']
 
-def test_validate_audio_file_not_found():
+def test_validate_audio_file_not_found(nonexistent_audio_path):
     """Test validation with non-existent file."""
     ak = AudioKit()
     with pytest.raises(ValidationError, match="Audio file not found"):
-        ak._validate_audio_file("nonexistent.wav")
+        ak._validate_audio_file(str(nonexistent_audio_path))
 
 def test_validate_audio_file_invalid_format(tmp_path):
     """Test validation with invalid audio format."""
@@ -38,7 +43,6 @@ def test_analyze_audio_complete(sample_audio_path):
     ak = AudioKit()
     result = ak.analyze_audio(str(sample_audio_path))
     
-    # Check all expected analysis components are present
     assert isinstance(result, dict)
     assert "bpm_key" in result
     assert "genre" in result
@@ -60,17 +64,14 @@ def test_analyze_audio_complete(sample_audio_path):
     assert all(isinstance(v, float) and 0 <= v <= 1 
               for v in result["instruments"].values())
 
-def test_analyze_audio_with_invalid_file():
+def test_analyze_audio_with_invalid_file(nonexistent_audio_path):
     """Test analysis with invalid audio file."""
     ak = AudioKit()
-    with pytest.raises(ValidationError):
-        ak.analyze_audio("nonexistent.wav")
+    with pytest.raises(ValidationError, match="Audio file not found"):
+        ak.analyze_audio(str(nonexistent_audio_path))
 
-def test_analyze_audio_with_corrupted_file(tmp_path):
+def test_analyze_audio_with_corrupted_file(corrupted_audio_path):
     """Test analysis with corrupted audio file."""
-    corrupted_file = tmp_path / "corrupted.wav"
-    corrupted_file.write_bytes(b"not a valid wav file")
-    
     ak = AudioKit()
-    with pytest.raises(AudioFileError):
-        ak.analyze_audio(str(corrupted_file)) 
+    with pytest.raises(AudioFileError, match="Invalid audio file"):
+        ak.analyze_audio(str(corrupted_audio_path)) 

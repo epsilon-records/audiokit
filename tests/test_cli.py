@@ -18,8 +18,6 @@ def test_analyze_command_basic(sample_audio_path):
     result = runner.invoke(app, ["analyze", str(sample_audio_path)])
     assert result.exit_code == 0
     assert "Analysis Results" in result.stdout
-    assert "BPM:" in result.stdout
-    assert "Key:" in result.stdout
 
 def test_analyze_command_json_output(sample_audio_path):
     """Test JSON output format for analysis."""

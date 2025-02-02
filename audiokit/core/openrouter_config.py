@@ -1,5 +1,5 @@
-from llama_index.llms import OpenAILike
-from llama_index.embeddings import HuggingFaceEmbedding
+from llama_index.llms.openai_like import OpenAILike
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 def configure_openrouter(api_key: str):
     """Configure OpenRouter settings for LlamaIndex."""

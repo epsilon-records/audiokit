@@ -10,21 +10,23 @@ import pytest
 from pathlib import Path
 from dotenv import load_dotenv
 from loguru import logger
+import sys
+from audiokit.core.logging import get_logger
 
 # Load environment variables before any tests run
 load_dotenv()
 
 @pytest.fixture(scope="session", autouse=True)
-def log_api_keys():
-    """Log API keys used in tests."""
-    logger.debug("log_api_keys fixture is running")
-    from audiokit.core.config import config
-    logger.info("Using Pinecone API key: {}", config.pinecone_api_key)
-    logger.info("Using Pinecone index: {}", config.pinecone_index_name)
-    logger.info("Using OpenRouter API key: {}", config.openrouter_api_key)
-    yield
+def setup_test_env():
+    """Setup test environment."""
+    # Set environment variables for testing
+    os.environ["AUDIOKIT_TEST"] = "true"
+    os.environ["AUDIOKIT_LOG_LEVEL"] = "WARNING"  # Reduce log noise during tests
+    
+    # Initialize logging
+    get_logger()
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def fixture_dir() -> Path:
     """Return path to test fixtures directory."""
     return Path(__file__).parent / "fixtures"
@@ -35,22 +37,12 @@ def sample_audio_path(fixture_dir) -> Path:
     return fixture_dir / "sample.wav"
 
 @pytest.fixture(autouse=True)
-def setup_test_env(tmp_path):
-    """Setup test environment."""
-    # Store original working directory
-    original_cwd = os.getcwd()
-    
-    # Create test output directory
-    output_dir = tmp_path / "output"
-    output_dir.mkdir()
-    
-    # Set environment variables for testing
-    os.environ["AUDIOKIT_TEST"] = "true"
-    os.environ["AUDIOKIT_OUTPUT_DIR"] = str(output_dir)
-    
-    yield
-    
-    # Cleanup
-    os.chdir(original_cwd)
-    os.environ.pop("AUDIOKIT_TEST", None)
-    os.environ.pop("AUDIOKIT_OUTPUT_DIR", None) 
+def setup_logging():
+    """Setup logging for tests."""
+    logger = get_logger('tests')
+    logger.remove()  # Remove any existing handlers
+    logger.add(
+        sys.stderr,
+        format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | <level>{message}</level>",
+        level="DEBUG"
+    ) 

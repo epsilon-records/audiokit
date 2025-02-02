@@ -58,10 +58,10 @@ def test_invalid_search():
     with pytest.raises(IndexingError):
         ak.search_audio("")
 
-def test_similar_nonexistent_file():
+def test_similar_nonexistent_file(nonexistent_audio_path):
     """Test finding similar files with nonexistent reference."""
     with pytest.raises(IndexingError):
-        ak.find_similar("nonexistent.wav")
+        ak.find_similar(str(nonexistent_audio_path))
 
 def test_versioning(sample_audio_path):
     """Test document versioning system."""
@@ -124,7 +124,7 @@ def test_document_id_uniqueness(sample_audio_path):
 def test_metadata_completeness(sample_audio_path):
     """Test metadata completeness in indexed documents."""
     # Analyze audio
-    ak.analyze_audio(str(sample_audio_path))
+    analysis = ak.analyze_audio(str(sample_audio_path))
     
     # Search for document
     results = ak.search_audio(f"file_name:{sample_audio_path.name}")
