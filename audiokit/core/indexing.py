@@ -1,76 +1,68 @@
 """
-AudioKit Indexing
-===============
-
-Intelligent indexing and search using LlamaIndex.
+Audio Indexing Module
+===================
+Handles indexing and searching of audio analysis results.
 """
 
+import json
+import os
 from typing import Dict, Any, List, Optional
 from pathlib import Path
-import json
 from datetime import datetime
-from collections import defaultdict
 
-from llama_index import (
-    VectorStoreIndex,
-    SimpleDirectoryReader,
-    Document,
-    ServiceContext,
-    StorageContext
-)
-from llama_index.vector_stores import PineconeVectorStore
-from llama_index.embeddings import OpenAIEmbedding
+# Updated imports to avoid circular dependencies
+from llama_index.core import VectorStoreIndex, Document
+from llama_index.core.storage.storage_context import StorageContext
+from llama_index.vector_stores.pinecone import PineconeVectorStore
+import pinecone
 
 from .logging import get_logger
-from .config import config
 from .exceptions import IndexingError
 
 logger = get_logger(__name__)
 
 class AudioIndex:
-    """Manages intelligent indexing and search for audio data."""
+    """Manages indexing and searching of audio analysis results."""
     
     def __init__(self):
-        """Initialize the audio indexing system."""
-        logger.debug("Initializing AudioIndex")
-        self._setup_index()
-        self._version_tracker = defaultdict(int)  # Track document versions
-    
-    def _setup_index(self):
-        """Setup the indexing infrastructure."""
+        """Initialize the audio index."""
         try:
-            # Initialize embedding model
-            embed_model = OpenAIEmbedding()
-            service_context = ServiceContext.from_defaults(
-                embed_model=embed_model
+            # Initialize Pinecone
+            pinecone.init(
+                api_key=os.getenv("PINECONE_API_KEY"),
+                environment=os.getenv("PINECONE_ENV")
             )
             
-            # Initialize vector store
-            vector_store = PineconeVectorStore(
-                index_name="audiokit-index"
-            )
+            # Get or create index
+            index_name = "audiokit"
+            if index_name not in pinecone.list_indexes():
+                pinecone.create_index(
+                    name=index_name,
+                    dimension=1536,  # Default for OpenAI embeddings
+                    metric="cosine"
+                )
+            
+            # Setup vector store
+            pinecone_index = pinecone.Index(index_name)
+            vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
+            
+            # Create storage context
             storage_context = StorageContext.from_defaults(
                 vector_store=vector_store
             )
             
-            # Create or load index
-            self.index = VectorStoreIndex(
+            # Initialize vector store index
+            self.index = VectorStoreIndex.from_documents(
                 [],
-                service_context=service_context,
-                storage_context=storage_context
+                storage_context=storage_context,
+                show_progress=True  # Enable progress directly in the method
             )
             
-            logger.info("Index setup complete")
+            logger.info("Audio index initialized successfully")
             
         except Exception as e:
-            logger.exception("Failed to setup index")
-            raise IndexingError("Failed to initialize indexing") from e
-    
-    def _get_version(self, audio_path: str, operation: str) -> int:
-        """Get current version for a document."""
-        key = f"{audio_path}-{operation}"
-        self._version_tracker[key] += 1
-        return self._version_tracker[key]
+            logger.exception("Failed to initialize audio index")
+            raise IndexingError("Index initialization failed") from e
     
     def index_data(
         self,
@@ -79,84 +71,57 @@ class AudioIndex:
         operation: str
     ) -> None:
         """
-        Index audio data with versioning and enhanced metadata.
+        Index audio analysis or processing results.
         
         Args:
-            audio_path: Path to the audio file
+            audio_path: Path to audio file
             data: Data to index
-            operation: Type of operation (analysis/processing/generation)
+            operation: Type of operation (analysis/processing)
         """
         try:
-            logger.info("Indexing {} results for: {}", operation, audio_path)
-            
-            # Create enhanced metadata
+            # Create metadata
             metadata = {
                 "audio_path": audio_path,
                 "file_name": Path(audio_path).name,
                 "operation": operation,
                 "timestamp": datetime.now().isoformat(),
-                "version": self._get_version(audio_path, operation)
+                "version": self._get_next_version(audio_path),
+                "id": f"{Path(audio_path).stem}_{operation}"
             }
             
-            # Create document with versioning
-            document = Document(
+            # Create document
+            doc = Document(
                 text=json.dumps(data, indent=2),
-                metadata=metadata,
-                id=f"{audio_path}-{operation}-{metadata['version']}"
+                metadata=metadata
             )
             
-            # Insert document
-            self.index.insert(document)
-            logger.success("Successfully indexed {} results", operation)
+            # Index document
+            self.index.insert(doc)
+            logger.debug("Indexed {} data for: {}", operation, audio_path)
             
         except Exception as e:
             logger.exception("Failed to index data")
             raise IndexingError("Data indexing failed") from e
     
-    def index_analysis(
-        self,
-        audio_path: str,
-        analysis_results: Dict[str, Any]
-    ) -> None:
-        """
-        Index audio analysis results.
-        
-        Args:
-            audio_path: Path to the analyzed audio file
-            analysis_results: Analysis results to index
-        """
+    def _get_next_version(self, audio_path: str) -> int:
+        """Get next version number for audio file."""
         try:
-            logger.info("Indexing analysis results for: {}", audio_path)
-            
-            # Create document from analysis results
-            doc_text = json.dumps(analysis_results, indent=2)
-            metadata = {
-                "audio_path": audio_path,
-                "file_name": Path(audio_path).name,
-                "analysis_type": list(analysis_results.keys())
-            }
-            
-            document = Document(
-                text=doc_text,
-                metadata=metadata
-            )
-            
-            # Index the document
-            self.index.insert(document)
-            logger.success("Successfully indexed analysis results")
-            
-        except Exception as e:
-            logger.exception("Failed to index analysis results")
-            raise IndexingError("Failed to index analysis") from e
+            results = self.search_audio(f"file_name:{Path(audio_path).name}")
+            if not results:
+                return 1
+            versions = [r["metadata"]["version"] for r in results]
+            return max(versions) + 1
+        except Exception:
+            return 1
     
-    def search(
+    def search_audio(
         self,
         query: str,
         n_results: int = 5,
         filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
-        Search indexed audio analyses.
+        Search indexed audio data.
         
         Args:
             query: Search query
@@ -164,76 +129,53 @@ class AudioIndex:
             filters: Optional metadata filters
             
         Returns:
-            List of matching results with scores
+            list: Search results with scores and metadata
         """
         try:
-            logger.info("Searching with query: {}", query)
-            
-            # Create query engine
-            query_engine = self.index.as_query_engine(
-                similarity_top_k=n_results
-            )
-            
             # Execute search
-            response = query_engine.query(query)
+            response = self.index.as_query_engine().query(
+                query,
+                similarity_top_k=n_results,
+                filters=filters
+            )
             
             # Format results
             results = []
             for node in response.source_nodes:
-                result = {
+                results.append({
                     "score": node.score,
-                    "metadata": node.metadata,
-                    "content": json.loads(node.text)
-                }
-                results.append(result)
+                    "content": json.loads(node.text),
+                    "metadata": node.metadata
+                })
             
-            logger.debug("Found {} results", len(results))
             return results
             
         except Exception as e:
             logger.exception("Search failed")
-            raise IndexingError("Failed to execute search") from e
+            raise IndexingError("Search failed") from e
     
     def similar_audio(
         self,
         audio_path: str,
         n_results: int = 5
     ) -> List[Dict[str, Any]]:
-        """
-        Find similar audio files based on analysis.
-        
-        Args:
-            audio_path: Path to reference audio file
-            n_results: Number of results to return
-            
-        Returns:
-            List of similar audio files with similarity scores
-        """
+        """Find similar audio files based on indexed data."""
         try:
-            logger.info("Finding similar audio to: {}", audio_path)
+            # Get document for reference audio
+            results = self.search_audio(f"file_name:{Path(audio_path).name}", n_results=1)
+            if not results:
+                raise IndexingError(f"No index entry found for: {audio_path}")
             
-            # Get reference audio metadata
-            query = f"file_name:{Path(audio_path).name}"
-            ref_results = self.search(query, n_results=1)
-            
-            if not ref_results:
-                raise IndexingError("Reference audio not found in index")
-            
-            ref_analysis = ref_results[0]["content"]
-            
-            # Search for similar audio
-            query = json.dumps(ref_analysis)
-            results = self.search(query, n_results=n_results + 1)
-            
-            # Remove reference audio from results
-            results = [r for r in results if r["metadata"]["audio_path"] != audio_path]
-            
-            logger.debug("Found {} similar audio files", len(results))
-            return results[:n_results]
+            # Search for similar documents
+            query = results[0]["content"]
+            return self.search_audio(
+                json.dumps(query),
+                n_results=n_results + 1  # Add 1 to exclude self-match
+            )[1:]  # Exclude first result (self)
             
         except Exception as e:
             logger.exception("Similar audio search failed")
-            raise IndexingError("Failed to find similar audio") from e
+            raise IndexingError("Similar audio search failed") from e
 
-# Global index instance
+# Create global index instance
 audio_index = AudioIndex() 

@@ -5,6 +5,7 @@ Provides comprehensive audio analysis features including BPM detection,
 genre classification, and instrument identification.
 """
 
+import torch
 import torchaudio
 import torchaudio.transforms as transforms
 from typing import Dict, Any

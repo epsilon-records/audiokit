@@ -237,3 +237,8 @@ class AudioKit:
 ak = AudioKit()
 
 __all__ = ['ak', 'AudioKit']
+
+__version__ = "0.1.0"
+
+# Initialize logging
+setup_logging()
