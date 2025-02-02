@@ -12,7 +12,6 @@ from datetime import datetime
 
 from llama_index.core import VectorStoreIndex, Document, StorageContext
 from llama_index.vector_stores.pinecone import PineconeVectorStore
-from pinecone import Pinecone
 
 from .logging import get_logger
 from .exceptions import IndexingError, ConfigurationError
@@ -32,18 +31,14 @@ class AudioIndex:
                 logger.error("Pinecone API key is missing in configuration")
                 raise ConfigurationError("Pinecone API key is not configured")
             
-            # Initialize Pinecone client
-            logger.debug("Initializing Pinecone client")
-            self.pinecone_client = Pinecone(
-                api_key=config.pinecone_api_key
-            )
-            
             logger.debug(f"Using Pinecone index: {config.pinecone_index_name}")
             logger.debug("Initializing Pinecone vector store")
             
             # Initialize Pinecone vector store through LlamaIndex
             vector_store = PineconeVectorStore(
-                pinecone_index=self.pinecone_client.Index(config.pinecone_index_name),
+                api_key=config.pinecone_api_key,
+                index_name=config.pinecone_index_name,
+                insert_kwargs={},
                 add_sparse_vector=False,
                 tokenizer=None,
                 default_empty_query_vector=None,

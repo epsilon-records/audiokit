@@ -10,6 +10,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from audiokit import ak
 from audiokit.core.exceptions import IndexingError
+from audiokit.core.config import config
 
 def test_analysis_indexing(sample_audio_path):
     """Test indexing of analysis results."""
@@ -160,4 +161,13 @@ def test_version_rollover(sample_audio_path):
     assert versions == sorted(versions, reverse=True), "Versions should be in descending order"
     
     # Verify no version number conflicts
-    assert len(versions) == len(set(versions)), "All version numbers should be unique" 
+    assert len(versions) == len(set(versions)), "All version numbers should be unique"
+
+def test_index_initialization():
+    # Test that the index can be initialized
+    from audiokit.core.indexing import AudioIndex
+    try:
+        index = AudioIndex()
+        assert index is not None
+    except Exception as e:
+        pytest.fail(f"Index initialization failed: {str(e)}") 

@@ -18,7 +18,5 @@ To trigger a manual build:
    ```
    PINECONE_API_KEY=your-api-key
    PINECONE_INDEX_NAME=audiokit-brain
-   PINECONE_DIMENSION=1536
-   PINECONE_METRIC=cosine
    ```
 3. Ensure the `.env` file is not committed to version control

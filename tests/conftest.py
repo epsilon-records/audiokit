@@ -8,6 +8,15 @@ Shared fixtures and configuration for AudioKit tests.
 import os
 import pytest
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables before any tests run
+load_dotenv()
+
+@pytest.fixture(scope="session", autouse=True)
+def load_env():
+    """Ensure environment variables are loaded for all tests."""
+    pass
 
 @pytest.fixture
 def fixture_dir() -> Path:
