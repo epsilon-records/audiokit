@@ -10,11 +10,11 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 from datetime import datetime
 
-# Updated imports to use the correct package structure
-from llama_index.core import VectorStoreIndex, Document
-from llama_index.core.storage.storage_context import StorageContext
-from llama_index.vector_stores.pinecone import PineconeVectorStore
 import pinecone
+
+# NEW: Top-level imports for llama_index 0.12.x
+from llama_index import VectorStoreIndex, Document, StorageContext
+from llama_index.vector_stores import PineconeVectorStore
 
 from .logging import get_logger
 from .exceptions import IndexingError
@@ -47,15 +47,13 @@ class AudioIndex:
             vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
             
             # Create storage context
-            storage_context = StorageContext.from_defaults(
-                vector_store=vector_store
-            )
+            storage_context = StorageContext.from_defaults(vector_store=vector_store)
             
             # Initialize vector store index
             self.index = VectorStoreIndex.from_documents(
                 [],
                 storage_context=storage_context,
-                show_progress=True  # Enable progress directly in the method
+                show_progress=True  # Show progress in the method
             )
             
             logger.info("Audio index initialized successfully")
@@ -72,11 +70,6 @@ class AudioIndex:
     ) -> None:
         """
         Index audio analysis or processing results.
-        
-        Args:
-            audio_path: Path to audio file
-            data: Data to index
-            operation: Type of operation (analysis/processing)
         """
         try:
             # Create metadata
@@ -95,9 +88,9 @@ class AudioIndex:
                 metadata=metadata
             )
             
-            # Index document
+            # Insert document into the index
             self.index.insert(doc)
-            logger.debug("Indexed {} data for: {}", operation, audio_path)
+            logger.debug("Indexed %s data for: %s", operation, audio_path)
             
         except Exception as e:
             logger.exception("Failed to index data")
@@ -122,14 +115,6 @@ class AudioIndex:
     ) -> List[Dict[str, Any]]:
         """
         Search indexed audio data.
-        
-        Args:
-            query: Search query
-            n_results: Number of results to return
-            filters: Optional metadata filters
-            
-        Returns:
-            list: Search results with scores and metadata
         """
         try:
             # Execute search
@@ -162,20 +147,23 @@ class AudioIndex:
         """Find similar audio files based on indexed data."""
         try:
             # Get document for reference audio
-            results = self.search_audio(f"file_name:{Path(audio_path).name}", n_results=1)
+            results = self.search_audio(
+                f"file_name:{Path(audio_path).name}",
+                n_results=1
+            )
             if not results:
                 raise IndexingError(f"No index entry found for: {audio_path}")
             
-            # Search for similar documents
+            # Search for similar documents (excluding the reference itself)
             query = results[0]["content"]
             return self.search_audio(
                 json.dumps(query),
-                n_results=n_results + 1  # Add 1 to exclude self-match
-            )[1:]  # Exclude first result (self)
+                n_results=n_results + 1  # +1 to exclude self-match
+            )[1:]
             
         except Exception as e:
             logger.exception("Similar audio search failed")
             raise IndexingError("Similar audio search failed") from e
 
-# Create global index instance
-audio_index = AudioIndex() 
+# Create a global instance
+audio_index = AudioIndex()
