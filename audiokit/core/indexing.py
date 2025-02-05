@@ -12,6 +12,7 @@ from datetime import datetime
 
 from llama_index.core import VectorStoreIndex, Document, StorageContext, Settings
 from llama_index.vector_stores.pinecone import PineconeVectorStore
+from llama_index.schema import ResponseMode
 
 from .logging import get_logger
 from .exceptions import IndexingError, ConfigurationError
@@ -129,16 +130,18 @@ class AudioIndex:
         try:
             logger.info("Searching audio with query: {}", query)
             
-            # Create query engine with proper parameters
+            # Create query engine with proper parameters; use NO_TEXT mode to bypass LLM synthesis.
             query_engine = self.index.as_query_engine(
                 similarity_top_k=n_results,
-                filters=filters
+                filters=filters,
+                response_mode=ResponseMode.NO_TEXT
             )
             
             response = query_engine.query(query)
             
-            if not response:
-                logger.warning("No results found for query: {}", query)
+            # Check that the response has the expected attributes.
+            if response is None or not hasattr(response, "source_nodes"):
+                logger.warning("Invalid or empty response for query: {}", query)
                 return []
             
             return [{

@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from audiokit.core.logging import get_logger
 import respx
 import httpx
+from llama_index.llms.openai_like.base import OpenAILike
 
 logger = get_logger(__name__)
 
@@ -74,3 +75,32 @@ def mock_http_calls(request):
                 return_value=httpx.Response(200, json={"dummy": "response"})
             )
             yield respx_mock 
+
+# Define dummy classes to simulate a valid LLM response structure
+class DummyNodeInner:
+    def get_content(self):
+        return "dummy indexed content"
+    metadata = {"label": "test", "info": "dummy metadata"}
+
+class DummyNode:
+    node = DummyNodeInner()
+    score = 1.0
+
+class DummyResponse:
+    # Although the choice isn't used in search_audio, we include it for completeness
+    class DummyChoice:
+        text = "dummy response"
+    choices = [DummyChoice()]
+    # This attribute is used by search_audio to extract search results
+    source_nodes = [DummyNode()]
+
+def dummy_complete(self, prompt, **kwargs):
+    return DummyResponse()
+
+@pytest.fixture(autouse=True)
+def patch_llm(monkeypatch):
+    """
+    Automatically patch the 'complete' method of OpenAILike to return a dummy
+    response. This bypasses the external API call during tests.
+    """
+    monkeypatch.setattr(OpenAILike, "complete", dummy_complete) 
