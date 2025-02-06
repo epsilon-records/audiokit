@@ -1,198 +1,150 @@
-"""AudioKit client package for audio processing and analysis."""
-from typing import Optional, Dict, Any, BinaryIO, Union, List
+"""AudioKit client package."""
+from typing import Optional, BinaryIO, Union
 from pathlib import Path
-import asyncio
 import httpx
-from .plugin import PluginManager
-from .errors import (
-    APIError,
-    AuthenticationError,
-    RateLimitError,
-    ValidationError,
-    ProcessingError
-)
-from .batch import BatchProcessor, BatchItem
+from .errors import APIError, AuthError, ValidationError
+from .config import load_config, ClientConfig
+import yaml
 
 class AudioKit:
-    """Main client class for interacting with AudioKit AI services."""
+    """Client for AudioKit AI service."""
     
     def __init__(
-        self, 
-        api_url: str = "http://localhost:8000",
+        self,
+        api_url: Optional[str] = None,
         api_key: Optional[str] = None,
-        timeout: float = 30.0,
-        max_retries: int = 3
+        config_path: Optional[Path] = None
     ):
         """Initialize AudioKit client.
         
         Args:
-            api_url: Base URL for AudioKit AI service
-            api_key: Optional API key for authentication
-            timeout: Request timeout in seconds
-            max_retries: Maximum number of retry attempts
-            
-        Raises:
-            ValidationError: If api_url is invalid
+            api_url: API URL (overrides config)
+            api_key: API key (overrides config)
+            config_path: Path to config file
         """
-        self.api_url = api_url.rstrip('/')
-        self.api_key = api_key
-        self.timeout = timeout
-        self.max_retries = max_retries
-        self.client = httpx.AsyncClient(timeout=timeout)
-        self.plugins = PluginManager()
-        self.batch = BatchProcessor(self)
-
+        # Load config if provided, otherwise try default locations
+        config = {}
+        config_locations = [
+            config_path if config_path else None,
+            Path("config.yml"),
+            Path("audiokit/config.yml"),
+            Path.home() / ".audiokit/config.yml"
+        ]
+        
+        # Try each config location
+        for loc in config_locations:
+            if loc and loc.exists():
+                try:
+                    with open(loc) as f:
+                        config = yaml.safe_load(f)
+                    break
+                except Exception:
+                    continue
+        
+        # Set API URL (command line takes precedence)
+        self.api_url = api_url or config.get('api_url', 'http://localhost:8000')
+        
+        # Set API key (command line takes precedence)
+        self.api_key = api_key or config.get('api_key')
+        
+        # Load other settings
+        self.timeout = float(config.get('timeout', 30.0))
+        self.max_file_size = int(config.get('max_file_size', 52428800))  # 50MB default
+        
+        # Initialize HTTP client
+        self.client = httpx.AsyncClient(
+            timeout=self.timeout,
+            follow_redirects=True
+        )
+        
     async def __aenter__(self):
         """Async context manager entry."""
         return self
-
+        
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
         await self.close()
-
+        
     async def close(self):
-        """Close the HTTP client."""
+        """Close HTTP client."""
         await self.client.aclose()
-
-    def _build_headers(self) -> Dict[str, str]:
-        """Build request headers.
-        
-        Returns:
-            Dict of HTTP headers
-        """
-        headers = {"Accept": "application/json"}
-        if self.api_key:
-            headers["X-API-Key"] = self.api_key
-        return headers
-
-    async def _make_request(
-        self,
-        method: str,
-        endpoint: str,
-        **kwargs
-    ) -> Dict[str, Any]:
-        """Make HTTP request with retry logic.
-        
-        Args:
-            method: HTTP method
-            endpoint: API endpoint
-            **kwargs: Additional arguments for request
-            
-        Returns:
-            JSON response data
-            
-        Raises:
-            APIError: If request fails
-            AuthenticationError: If authentication fails
-            RateLimitError: If rate limit exceeded
-        """
-        url = f"{self.api_url}/{endpoint.lstrip('/')}"
-        headers = {**self._build_headers(), **kwargs.pop("headers", {})}
-        
-        for attempt in range(self.max_retries):
-            try:
-                response = await self.client.request(
-                    method,
-                    url,
-                    headers=headers,
-                    **kwargs
-                )
-                response.raise_for_status()
-                return response.json()
-                
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == 401:
-                    raise AuthenticationError("Invalid API key")
-                elif e.response.status_code == 429:
-                    retry_after = int(e.response.headers.get("Retry-After", 60))
-                    raise RateLimitError(retry_after)
-                elif attempt == self.max_retries - 1:
-                    raise APIError(f"Request failed: {str(e)}")
-                await asyncio.sleep(2 ** attempt)  # Exponential backoff
-                
-            except httpx.RequestError as e:
-                if attempt == self.max_retries - 1:
-                    raise APIError(f"Request failed: {str(e)}")
-                await asyncio.sleep(2 ** attempt)
 
     async def analyze(
         self,
-        audio: Union[str, Path, BinaryIO],
-        **kwargs
-    ) -> Dict[str, Any]:
-        """Analyze audio file and extract properties.
+        audio: Union[str, Path, BinaryIO]
+    ) -> dict:
+        """Analyze audio file.
         
         Args:
             audio: Path to audio file or file-like object
-            **kwargs: Additional options for analysis
             
         Returns:
-            Dict containing audio analysis results
+            Analysis results
             
         Raises:
             ValidationError: If audio file is invalid
-            ProcessingError: If analysis fails
+            AuthError: If authentication fails
             APIError: If request fails
         """
+        headers = {}
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
+            
         files = {}
-        
         try:
+            # Handle file input
             if isinstance(audio, (str, Path)):
                 path = Path(audio)
                 if not path.exists():
                     raise ValidationError(f"File not found: {path}")
-                files = {"file": open(path, "rb")}
+                if not path.suffix.lower() in ('.wav', '.mp3', '.ogg', '.flac'):
+                    raise ValidationError(f"Unsupported audio format: {path.suffix}")
+                # Add content type based on file extension
+                content_type = {
+                    '.wav': 'audio/wav',
+                    '.mp3': 'audio/mpeg',
+                    '.ogg': 'audio/ogg',
+                    '.flac': 'audio/flac'
+                }.get(path.suffix.lower())
+                files = {"file": (path.name, open(path, "rb"), content_type)}
             else:
                 files = {"file": audio}
                 
-            return await self._make_request(
-                "POST",
-                "/analyze",
-                files=files,
-                **kwargs
-            )
-            
-        except (OSError, IOError) as e:
-            raise ValidationError(f"Invalid audio file: {str(e)}")
+            # Make request
+            try:
+                response = await self.client.post(
+                    f"{self.api_url}/analyze",
+                    headers=headers,
+                    files=files
+                )
+                
+                # Handle errors
+                if response.status_code == 401:
+                    raise AuthError("Invalid API key")
+                elif response.status_code == 403:
+                    raise AuthError("API key does not have required permissions")
+                elif response.status_code == 400:
+                    error_detail = response.json().get('detail', 'Bad request')
+                    raise ValidationError(f"Invalid request: {error_detail}")
+                response.raise_for_status()
+                
+                return response.json()
+                
+            except httpx.HTTPStatusError as e:
+                error_detail = ""
+                try:
+                    error_data = e.response.json()
+                    error_detail = f": {error_data.get('detail', '')}"
+                except:
+                    pass
+                raise APIError(
+                    f"API request failed: {str(e)}{error_detail}",
+                    status_code=e.response.status_code
+                )
+            except httpx.RequestError as e:
+                raise APIError(f"Request failed: {str(e)}")
+                
         finally:
-            # Close file if we opened it
+            # Clean up file handle if we opened it
             if isinstance(audio, (str, Path)) and "file" in files:
-                files["file"].close()
-
-    async def process(
-        self,
-        audio: Union[str, Path, BinaryIO],
-        output: Optional[Union[str, Path]] = None,
-        **kwargs
-    ) -> Union[bytes, None]:
-        """Process audio file with effects and filters.
-        
-        Args:
-            audio: Path to audio file or file-like object
-            output: Optional output path, if None returns processed audio bytes
-            **kwargs: Processing options
-            
-        Returns:
-            Processed audio bytes if output is None, otherwise None
-            
-        Raises:
-            ValidationError: If input/output paths are invalid
-            ProcessingError: If processing fails
-            APIError: If request fails
-        """
-        # TODO: Implement audio processing endpoint
-        raise NotImplementedError("Audio processing not yet implemented")
-
-    async def process_batch(self, items: List[BatchItem]) -> List[BatchItem]:
-        """Process multiple audio files in batch.
-        
-        Args:
-            items: List of batch items to process
-            
-        Returns:
-            Processed batch items with results/errors
-            
-        Raises:
-            BatchError: If batch processing fails
-        """
-        return await self.batch.process(items) 
+                files["file"][1].close() 

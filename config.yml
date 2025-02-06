@@ -1,0 +1,19 @@
+# API Settings
+api_url: "http://localhost:8000"
+api_key: "test-key"  # Match the server's test key
+
+# Request Settings
+timeout: 30.0
+max_retries: 3
+retry_delay: 1.0
+
+# Processing Settings
+max_file_size: 209715200  # 200MB
+allowed_formats:
+  - wav
+  - mp3
+  - ogg
+  - flac
+
+# Output Settings
+default_format: "table" 
