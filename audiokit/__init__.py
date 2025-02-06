@@ -5,6 +5,9 @@ import httpx
 from .errors import APIError, AuthError, ValidationError
 from .config import load_config, ClientConfig
 import yaml
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AudioKit:
     """Client for AudioKit AI service."""
@@ -128,7 +131,12 @@ class AudioKit:
                     raise ValidationError(f"Invalid request: {error_detail}")
                 response.raise_for_status()
                 
-                return response.json()
+                result = response.json()
+                if result.get('errors'):
+                    logger.warning("Some analysis operations failed:")
+                    for error in result['errors']:
+                        logger.warning(f"- {error}")
+                return result
                 
             except httpx.HTTPStatusError as e:
                 error_detail = ""
@@ -144,6 +152,8 @@ class AudioKit:
             except httpx.RequestError as e:
                 raise APIError(f"Request failed: {str(e)}")
                 
+        except Exception as e:
+            raise APIError(f"Analysis failed: {str(e)}")
         finally:
             # Clean up file handle if we opened it
             if isinstance(audio, (str, Path)) and "file" in files:
