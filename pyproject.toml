@@ -8,7 +8,6 @@ authors = ["Nathaniel Houk <nate@audiokit.ai>"]
 python = "^3.11"
 typer = {extras = ["all"], version = "^0.9.0"}
 requests = "^2.27.1"
-demucs = "^3.0.5"
 audiokit-core = {path = "../audiokit-core", develop = true}
 
 [tool.poetry.group.dev.dependencies]
