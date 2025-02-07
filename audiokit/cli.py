@@ -1,6 +1,6 @@
 import typer
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Annotated
 from .plugins.base import manager
 import requests
 import json
@@ -69,93 +69,152 @@ def analyze_spectral(
         handle_cli_error(e)
 
 @app.command()
-@click.argument("audio_file")
-def stems_separate(audio_file: str):
+def stems_separate(
+    audio_file: Annotated[
+        Path,
+        typer.Argument(..., exists=True, dir_okay=False, help="Audio file to separate")
+    ]
+):
     """Separate audio stems"""
     try:
-        # Implementation will go here
         raise NotImplementedError("Stem separation not implemented")
     except Exception as e:
         handle_cli_error(e)
 
 @app.command()
-@click.argument("fingerprint")
-def track_match(fingerprint: str):
+def track_match(
+    fingerprint: Annotated[
+        str,
+        typer.Argument(..., help="Audio fingerprint to match")
+    ]
+):
     """Match audio fingerprint"""
     try:
-        # Implementation will go here
         raise NotImplementedError("Track matching not implemented")
     except Exception as e:
         handle_cli_error(e)
 
 @app.command()
-@click.argument("audio_file")
-@click.option("--target-style")
-def style_transfer(audio_file: str, target_style: str):
+def style_transfer(
+    audio_file: Annotated[
+        str,
+        typer.Argument(..., help="Audio file to transform")
+    ],
+    target_style: Annotated[
+        str,
+        typer.Option(..., help="Target musical style")
+    ]
+):
     """Transfer musical style"""
-    raise click.UsageError("Not implemented yet")
+    raise typer.BadParameter("Not implemented yet")
 
 @app.command()
-@click.argument("lyrics_file")
-def lyric_compose(lyrics_file: str):
+def lyric_compose(
+    lyrics_file: Annotated[
+        str,
+        typer.Argument(..., help="Lyrics file for melody generation")
+    ]
+):
     """Generate melody from lyrics"""
-    raise click.UsageError("Not implemented yet")
+    raise typer.BadParameter("Not implemented yet")
 
 @app.command()
-@click.argument("social_data")
-def predict_crowd(social_data: str):
+def predict_crowd(
+    social_data: Annotated[
+        str,
+        typer.Argument(..., help="Social media data for prediction")
+    ]
+):
     """Predict crowd reaction"""
-    raise click.UsageError("Not implemented yet")
+    raise typer.BadParameter("Not implemented yet")
 
 @app.command()
-@click.argument("streaming_data")
-def model_royalties(streaming_data: str):
+def model_royalties(
+    streaming_data: Annotated[
+        str,
+        typer.Argument(..., help="Streaming data for royalty modeling")
+    ]
+):
     """Model royalty distributions"""
-    raise click.UsageError("Not implemented yet")
+    raise typer.BadParameter("Not implemented yet")
 
 @app.command()
-@click.argument("tour_dates")
-def plan_tour(tour_dates: str):
+def plan_tour(
+    tour_dates: Annotated[
+        str,
+        typer.Argument(..., help="Tour dates for optimization")
+    ]
+):
     """Optimize tour routing"""
-    raise click.UsageError("Not implemented yet")
+    raise typer.BadParameter("Not implemented yet")
 
 @app.command()
-@click.argument("market_data")
-def forecast_trends(market_data: str):
+def forecast_trends(
+    market_data: Annotated[
+        str,
+        typer.Argument(..., help="Market data for trend forecasting")
+    ]
+):
     """Forecast music trends"""
-    raise click.UsageError("Not implemented yet")
+    raise typer.BadParameter("Not implemented yet")
 
 @app.command()
-@click.argument("style1")
-@click.argument("style2")
-def blend_styles(style1: str, style2: str):
+def blend_styles(
+    style1: Annotated[
+        str,
+        typer.Argument(..., help="First musical style")
+    ],
+    style2: Annotated[
+        str,
+        typer.Argument(..., help="Second musical style")
+    ]
+):
     """Blend musical styles"""
-    raise click.UsageError("Not implemented yet")
+    raise typer.BadParameter("Not implemented yet")
 
 @app.command()
-@click.argument("cover_art")
-def animate_cover(cover_art: str):
+def animate_cover(
+    cover_art: Annotated[
+        str,
+        typer.Argument(..., help="Cover art file for animation")
+    ]
+):
     """Animate album artwork"""
-    raise click.UsageError("Not implemented yet")
+    raise typer.BadParameter("Not implemented yet")
 
 @app.command()
-@click.argument("audio_file")
-def create_nft(audio_file: str):
+def create_nft(
+    audio_file: Annotated[
+        str,
+        typer.Argument(..., help="Audio file for NFT creation")
+    ]
+):
     """Mint audio NFT"""
-    raise click.UsageError("Not implemented yet")
+    raise typer.BadParameter("Not implemented yet")
 
 @app.command()
-@click.argument("project_id")
-def launch_remix(project_id: str):
+def launch_remix(
+    project_id: Annotated[
+        str,
+        typer.Argument(..., help="Project ID for remix collaboration")
+    ]
+):
     """Launch remix collaboration"""
-    raise click.UsageError("Not implemented yet")
+    raise typer.BadParameter("Not implemented yet")
 
 @app.command()
-@click.argument("audio_file", type=click.Path(exists=True))
-@click.option("--method", "-m", default="librosa",
-              type=click.Choice(["librosa", "madmom"]),
-              help="Tempo estimation algorithm")
-def bpm(audio_file: str, method: str):
+def bpm(
+    audio_file: Annotated[
+        Path,
+        typer.Argument(..., exists=True, dir_okay=False, help="Audio file to analyze")
+    ],
+    method: Annotated[
+        str,
+        typer.Option("librosa", "--method", "-m", 
+                     help="Tempo estimation algorithm",
+                     case_sensitive=False)
+    ] = "librosa"
+):
     """Estimate audio tempo (BPM)"""
     try:
         with open(audio_file, "rb") as f:
@@ -167,7 +226,7 @@ def bpm(audio_file: str, method: str):
             
         if response.status_code == 200:
             data = response.json()
-            click.echo(f"Estimated BPM: {data['bpm']:.2f} ({data['method']} method)")
+            typer.echo(f"Estimated BPM: {data['bpm']:.2f} ({data['method']} method)")
         else:
             handle_api_error(response)
             
@@ -175,11 +234,18 @@ def bpm(audio_file: str, method: str):
         handle_cli_error(e)
 
 @app.command()
-@click.argument("audio_file", type=click.Path(exists=True))
-@click.option("--method", "-m", default="krumhansl",
-              type=click.Choice(["krumhansl", "temperley"]),
-              help="Key detection algorithm")
-def key(audio_file: str, method: str):
+def key(
+    audio_file: Annotated[
+        Path,
+        typer.Argument(..., exists=True, dir_okay=False, help="Audio file to analyze")
+    ],
+    method: Annotated[
+        str,
+        typer.Option("krumhansl", "--method", "-m", 
+                     help="Key detection algorithm",
+                     case_sensitive=False)
+    ] = "krumhansl"
+):
     """Detect musical key of audio"""
     try:
         with open(audio_file, "rb") as f:
@@ -191,7 +257,33 @@ def key(audio_file: str, method: str):
             
         if response.status_code == 200:
             data = response.json()
-            click.echo(f"Detected Key: {data['key']} (Confidence: {data['confidence']:.2%})")
+            typer.echo(f"Detected Key: {data['key']} (Confidence: {data['confidence']:.2%})")
+        else:
+            handle_api_error(response)
+            
+    except Exception as e:
+        handle_cli_error(e)
+
+@app.command()
+def upload(
+    file: Annotated[
+        Path,
+        typer.Argument(..., exists=True, dir_okay=False, 
+                      help="Audio file to process",
+                      # 200MB limit
+                      max_content_size=200 * 1024 * 1024)
+    ]
+):
+    """Upload audio file for processing"""
+    try:
+        with open(file, "rb") as f:
+            response = requests.post(
+                f"{API_URL}/upload",
+                files={"file": f}
+            )
+            
+        if response.status_code == 200:
+            typer.echo("File uploaded successfully")
         else:
             handle_api_error(response)
             
