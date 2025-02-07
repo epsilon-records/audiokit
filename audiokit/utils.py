@@ -1,16 +1,18 @@
 def handle_cli_error(error: Exception):
     """Standardized CLI error handling"""
     if isinstance(error, NotImplementedError):
-        click.secho(str(error), fg="yellow")
+        typer.secho(str(error), fg=typer.colors.YELLOW)
     else:
-        click.secho(f"Error: {str(error)}", fg="red")
-    sys.exit(1)
+        typer.secho(f"Error: {str(error)}", fg=typer.colors.RED)
+    raise typer.Exit(code=1)
 
 def handle_api_error(response):
     """Handle API response errors"""
     try:
         error = response.json()
-        click.secho(f"API Error ({response.status_code}): {error.get('detail')}", fg="red")
+        typer.secho(f"API Error ({response.status_code}): {error.get('detail')}", 
+                   fg=typer.colors.RED)
     except:
-        click.secho(f"Unknown API Error ({response.status_code})", fg="red")
-    sys.exit(1) 
+        typer.secho(f"Unknown API Error ({response.status_code})", 
+                   fg=typer.colors.RED)
+    raise typer.Exit(code=1) 

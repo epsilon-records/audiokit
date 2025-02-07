@@ -1,10 +1,13 @@
 import typer
+from pathlib import Path
+from typing import List, Optional
 from .plugins.base import manager
-import click
 import requests
 import json
+from .utils import handle_api_error, handle_cli_error
 
 app = typer.Typer(help="AudioKit Extensible CLI", pretty_exceptions_show_locals=False)
+API_URL = "http://localhost:8000"  # Should be configurable
 
 @app.callback()
 def main():
@@ -12,30 +15,36 @@ def main():
     pass
 
 @app.command()
-@click.argument("audio_file", type=click.Path(exists=True))
-@click.option("--window-size", default=0.1, help="Analysis window in seconds")
-def analyze_loudness(audio_file: str, window_size: float):
+def analyze_loudness(
+    audio_file: Path = typer.Argument(..., exists=True),
+    window_size: float = typer.Option(0.1, help="Analysis window in seconds")
+):
     """Analyze dynamic range and loudness characteristics"""
-    with open(audio_file, "rb") as f:
-        response = requests.post(
-            f"{API_URL}/analyze/loudness",
-            files={"audio_file": f},
-            params={"window_size": window_size}
-        )
-    
-    if response.status_code == 200:
-        data = response.json()
-        visualize_loudness_curve(data['loudness'], data['window_size'])
-    else:
-        handle_api_error(response)
+    try:
+        with open(audio_file, "rb") as f:
+            response = requests.post(
+                f"{API_URL}/analyze/loudness",
+                files={"audio_file": f},
+                params={"window_size": window_size}
+            )
+        
+        if response.status_code == 200:
+            data = response.json()
+            visualize_loudness_curve(data['loudness'], data['window_size'])
+        else:
+            handle_api_error(response)
+            
+    except Exception as e:
+        handle_cli_error(e)
 
 @app.command()
-@click.argument("audio_file", type=click.Path(exists=True))
-@click.option("--features", "-f", multiple=True, 
-              type=click.Choice(["mfcc", "centroid", "bandwidth", "contrast", "rolloff"]),
-              help="Spectral features to analyze")
-@click.option("--output", "-o", type=click.Path(), help="Output file for results")
-def analyze_spectral(audio_file: str, features: tuple, output: str):
+def analyze_spectral(
+    audio_file: Path = typer.Argument(..., exists=True),
+    features: List[str] = typer.Option(["mfcc", "centroid"], "--feature", "-f",
+                                      help="Spectral features to analyze"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o",
+                                        help="Output file for results")
+):
     """Perform comprehensive spectral analysis of audio file"""
     try:
         with open(audio_file, "rb") as f:
@@ -50,7 +59,7 @@ def analyze_spectral(audio_file: str, features: tuple, output: str):
             if output:
                 with open(output, "w") as f:
                     json.dump(data, f, indent=2)
-                click.echo(f"Results saved to {output}")
+                typer.echo(f"Results saved to {output}")
             else:
                 display_spectral_results(data)
         else:
