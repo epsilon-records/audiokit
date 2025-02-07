@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "audiokit"
 version = "0.1.0"
-description = "Client library for audio analysis"
-authors = ["Your Name <your.email@example.com>"]
+description = "🎧 AudioKit CLI: Command-line interface for audio analysis and processing"
+authors = ["Nathaniel Houk <nate@audiokit.ai>"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
