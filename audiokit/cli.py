@@ -165,5 +165,29 @@ def bpm(audio_file: str, method: str):
     except Exception as e:
         handle_cli_error(e)
 
+@app.command()
+@click.argument("audio_file", type=click.Path(exists=True))
+@click.option("--method", "-m", default="krumhansl",
+              type=click.Choice(["krumhansl", "temperley"]),
+              help="Key detection algorithm")
+def key(audio_file: str, method: str):
+    """Detect musical key of audio"""
+    try:
+        with open(audio_file, "rb") as f:
+            response = requests.post(
+                f"{API_URL}/analyze/key",
+                files={"audio_file": f},
+                params={"method": method}
+            )
+            
+        if response.status_code == 200:
+            data = response.json()
+            click.echo(f"Detected Key: {data['key']} (Confidence: {data['confidence']:.2%})")
+        else:
+            handle_api_error(response)
+            
+    except Exception as e:
+        handle_cli_error(e)
+
 if __name__ == "__main__":
     app() 
