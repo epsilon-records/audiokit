@@ -44,6 +44,7 @@ dependencies = [
     "sounddevice",       # Audio I/O
     "soundfile",         # Audio file I/O
     "librosa>=0.9.0",    # Music/audio analysis
+    "textual>=0.27.0",   # TUI framework
 ]
 
 [project.optional-dependencies]
@@ -69,7 +70,7 @@ dev = [
 ]
 
 [project.scripts]
-ak = "audiokit.cli.pipeline:app"
+ak = "audiokit.cli.app:run"
 
 [build-system]
 requires = ["hatchling"]
