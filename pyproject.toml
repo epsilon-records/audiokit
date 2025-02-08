@@ -44,7 +44,7 @@ dev = [
 ]
 
 [project.scripts]
-ak = "audiokit.cli.app:cli"
+ak = "audiokit.cli:main"
 
 [build-system]
 requires = ["hatchling"]

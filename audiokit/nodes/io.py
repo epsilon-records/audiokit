@@ -1,8 +1,10 @@
 """Input/Output nodes."""
 
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 import numpy as np
 import sounddevice as sd
+
 from .base import AudioNode
 
 
@@ -13,7 +15,11 @@ class AudioInputNode(AudioNode):
         super().__init__(node_id, **params)
         self.channels = params.get("channels", 2)
         self.stream = sd.InputStream(
-            channels=self.channels, samplerate=self.sample_rate, dtype=np.float32
+            channels=self.channels,
+            samplerate=self.sample_rate,
+            dtype=np.float32,
+            blocksize=1024,
+            latency="low",
         )
         self.stream.start()
 
@@ -43,13 +49,14 @@ class AudioOutputNode(AudioNode):
     def __init__(self, node_id: str, **params):
         super().__init__(node_id, **params)
         self.channels = params.get("channels", 2)
-        self.stream = sd.OutputStream(
+        # Eagerly instantiate and start the output stream
+        self._stream = sd.OutputStream(
             channels=self.channels, samplerate=self.sample_rate, dtype=np.float32
         )
-        self.stream.start()
+        self._stream.start()
 
     def process(self, input_data: Optional[np.ndarray] = None) -> np.ndarray:
         """Output audio to device."""
         if input_data is not None:
-            self.stream.write(input_data)
+            self._stream.write(input_data)
         return input_data
