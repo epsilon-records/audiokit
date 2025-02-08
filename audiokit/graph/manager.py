@@ -89,3 +89,25 @@ class AudioGraphManager:
     def _process_audio(self, input_data: np.ndarray) -> np.ndarray:
         """Process audio through the graph."""
         # ... rest of implementation ...
+        pass
+
+    def get_active_nodes(self) -> set:
+        """
+        Dummy method: Return a set of active node IDs.
+        In a real implementation, this would contain currently processing node IDs.
+        """
+        return set()
+
+    def get_node_cpu_usage(self) -> dict:
+        """
+        Dummy method: Return CPU usage percentages per node.
+        In a real implementation, this would return actual CPU load per node.
+        """
+        return {}
+
+    def get_node_signal_levels(self) -> dict:
+        """
+        Dummy method: Return current signal levels for nodes.
+        In a real implementation, this would return signal (dB) levels for each node.
+        """
+        return {}

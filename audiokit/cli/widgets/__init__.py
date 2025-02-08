@@ -1,5 +1,6 @@
 """AudioKit TUI widgets."""
 
+from .context_menu import NodeContextMenu
 from .monitor import AudioMonitor
 from .pipeline import PipelineGraph
 from .visualizers import SpectrumAnalyzer, VUMeter, WaveformDisplay
@@ -10,4 +11,5 @@ __all__ = [
     "WaveformDisplay",
     "SpectrumAnalyzer",
     "VUMeter",
+    "NodeContextMenu",
 ]
