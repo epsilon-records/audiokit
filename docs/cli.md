@@ -4,8 +4,27 @@ The AudioKit CLI provides tools for managing audio processing pipelines.
 
 ## Installation
 
+### Basic Installation
 ```bash
 pip install audiokit
+```
+
+### Install with Additional Features
+```bash
+# Install with audio effects
+pip install "audiokit[effects]"
+
+# Install with analysis tools
+pip install "audiokit[analysis]"
+
+# Install with all features
+pip install "audiokit[effects,analysis]"
+```
+
+### Development Installation
+```bash
+# Install development dependencies
+pip install "audiokit[dev]"
 ```
 
 ## Commands

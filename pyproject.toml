@@ -31,14 +31,41 @@ version = "0.1.0"
 description = "Audio processing toolkit"
 requires-python = ">=3.8"
 dependencies = [
-    "typer>=0.9.0",  # CLI framework
-    "shellingham>=1.3.0",  # Shell detection for typer
-    "pyyaml",      # YAML support
-    "rich",        # Terminal formatting
-    "loguru",      # Logging
-    "numpy",       # Numerical computing
-    "scipy",       # Scientific computing
-    "sounddevice", # Audio I/O
+    # Core dependencies
+    "typer>=0.9.0",      # CLI framework
+    "shellingham>=1.3.0", # Shell detection for typer
+    "pyyaml",            # YAML support
+    "rich",              # Terminal formatting
+    "loguru",            # Logging
+    
+    # Audio processing
+    "numpy>=1.20.0",     # Numerical computing
+    "scipy>=1.7.0",      # Scientific computing
+    "sounddevice",       # Audio I/O
+    "soundfile",         # Audio file I/O
+    "librosa>=0.9.0",    # Music/audio analysis
+]
+
+[project.optional-dependencies]
+effects = [
+    "pyroomacoustics",  # Room acoustics and reverb
+    "pedalboard",       # High-quality audio effects
+    "torch",            # Deep learning effects
+]
+
+analysis = [
+    "matplotlib",       # Visualization
+    "aubio",           # Music analysis
+    "essentia",        # Audio analysis
+]
+
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov",
+    "black",
+    "isort",
+    "mypy",
+    "ruff",
 ]
 
 [project.scripts]
@@ -49,7 +76,25 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build]
-packages = ["audiokit"]  # Specify the package directory
+packages = ["audiokit"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["audiokit"]  # Also needed for wheel builds
+packages = ["audiokit"]
+
+# Development tool configurations
+[tool.black]
+line-length = 88
+target-version = ["py38"]
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.8"
+strict = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py38"
+select = ["E", "F", "B", "I"]
