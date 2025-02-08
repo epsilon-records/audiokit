@@ -1,6 +1,7 @@
 """AudioKit Terminal User Interface."""
 
-from rich.graph import Graph
+import numpy as np
+import typer
 from rich.panel import Panel
 from textual.app import App, ComposeResult
 from textual.containers import Container
@@ -9,30 +10,7 @@ from textual.widgets import Footer, Header, Log, Tree
 
 from ..graph import AudioGraphManager
 from ..nodes import get_available_nodes
-
-
-class PipelineGraph(Widget):
-    """Visual representation of the audio pipeline."""
-
-    def __init__(self, graph: AudioGraphManager):
-        super().__init__()
-        self.graph = graph
-
-    def render(self) -> Panel:
-        """Render the pipeline graph."""
-        # Create graph visualization
-        graph = Graph()
-
-        # Add nodes
-        for node_id, node in self.graph.nodes.items():
-            node_type = node.__class__.__name__
-            graph.add_node(node_id, node_type)
-
-        # Add connections
-        for from_id, to_id in self.graph.connections:
-            graph.add_edge(from_id, to_id)
-
-        return Panel(graph, title="Pipeline Graph", border_style="cyan")
+from .widgets import AudioMonitor, PipelineGraph
 
 
 class NodeList(Widget):
@@ -59,7 +37,7 @@ class NodeList(Widget):
         return Panel(tree, title="Node Library", border_style="green")
 
 
-class AudioKitApp(App):
+class AudioKitTUI(App):
     """AudioKit Terminal User Interface."""
 
     CSS = """
@@ -80,6 +58,11 @@ class AudioKitApp(App):
         height: 100%;
     }
     
+    .monitor {
+        dock: bottom;
+        height: 15;
+    }
+    
     Log {
         height: 30%;
         dock: bottom;
@@ -98,8 +81,22 @@ class AudioKitApp(App):
         """Create child widgets."""
         yield Header()
         yield Container(NodeList(), classes="sidebar")
-        yield Container(PipelineGraph(AudioGraphManager()), Log(), classes="main")
+        yield Container(
+            PipelineGraph(AudioGraphManager()), AudioMonitor(), Log(), classes="main"
+        )
         yield Footer()
+
+    def on_mount(self) -> None:
+        """Set up audio monitoring."""
+        self.monitor = self.query_one(AudioMonitor)
+        # Start audio monitoring thread
+        self.graph = self.query_one(PipelineGraph).graph
+        self.graph.set_monitor_callback(self._on_audio_update)
+
+    def _on_audio_update(self, input_data: np.ndarray, output_data: np.ndarray) -> None:
+        """Handle audio monitoring updates."""
+        self.monitor.update_input_levels(input_data)
+        self.monitor.update_output_levels(output_data)
 
     def action_toggle_log(self) -> None:
         """Toggle the log visibility."""
@@ -122,11 +119,28 @@ class AudioKitApp(App):
         # TODO: Implement pipeline saving
 
 
-def run():
+def run_tui():
     """Run the AudioKit TUI."""
-    app = AudioKitApp()
+    app = AudioKitTUI()
     app.run()
 
 
+cli = typer.Typer()
+
+
+@cli.command()
+def pipeline():
+    """Manage audio processing pipelines."""
+    run_tui()
+
+
+@cli.callback(invoke_without_command=True)
+def main(ctx: typer.Context):
+    """AudioKit Terminal User Interface."""
+    if ctx.invoked_subcommand is None:
+        # No subcommand was specified, run the TUI
+        run_tui()
+
+
 if __name__ == "__main__":
-    run()
+    cli()
