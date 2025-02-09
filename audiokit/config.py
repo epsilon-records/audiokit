@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 DEFAULT_CONFIG = {
-    "api_base_url": "http://localhost:8000/api",
+    "api_base_url": "http://localhost:8000/api/v1",
     "log_level": "INFO",
 }
 
