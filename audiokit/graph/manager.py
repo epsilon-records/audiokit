@@ -43,14 +43,20 @@ class AudioGraphManager:
             if self.monitor_callback:
                 self.monitor_callback(indata, outdata)
 
-        self.stream = sd.Stream(
-            channels=2,
-            callback=callback,
-            samplerate=44100,
-            blocksize=1024,
-            dtype=np.float32,
-        )
-        self.stream.start()
+        try:
+            self.stream = sd.Stream(
+                channels=2,
+                callback=callback,
+                samplerate=44100,
+                blocksize=1024,
+                dtype=np.float32,
+            )
+            self.stream.start()
+        except sd.PortAudioError as e:
+            logger.warning(
+                f"Audio device not available: {e}. Running in headless mode without audio."
+            )
+            self.stream = None
 
     def add_node(self, node: Any) -> None:
         """Add a node to the graph."""
