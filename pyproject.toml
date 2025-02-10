@@ -10,7 +10,7 @@ dependencies = [
     "pyyaml",            # YAML support
     "rich",              # Terminal formatting
     "loguru",            # Logging
-    "httpx",
+    "httpx>=0.24.0",
     
     # Audio processing
     "numpy>=1.20.0",     # Numerical computing
@@ -21,6 +21,8 @@ dependencies = [
     "textual>=0.52.1",   # TUI framework
     "plotext>=5.2.8",    # Terminal plotting
     "pyaudio",
+    "asyncio",
+    "websockets>=10.0",
 ]
 
 [project.optional-dependencies]

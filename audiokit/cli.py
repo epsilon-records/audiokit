@@ -1,11 +1,14 @@
+import asyncio
 import base64
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
 import httpx
 import typer
+import websockets
 from loguru import logger
 from typer.core import TyperGroup
 
@@ -43,15 +46,41 @@ graph_app = typer.Typer(
 )
 
 
-def call_api(endpoint: str, files: dict = None, data: dict = None) -> dict:
+def call_api(
+    endpoint: str, files: dict = None, data: dict = None, verbose: bool = False
+) -> dict:
     """
     Helper function for making API calls.
     """
     url = f"{get_api_base_url()}/{endpoint}"
     try:
-        response = httpx.post(url, files=files, data=data)
+        if verbose:
+            logger.remove()
+            logger.add(sys.stderr, level="DEBUG")
+
+        response = httpx.post(url, files=files, data=data, timeout=300)
         response.raise_for_status()
         return response.json()
+    except Exception as e:
+        logger.error(f"API call to {endpoint} failed: {e}")
+        raise typer.Exit(1)
+
+
+async def call_api_async(
+    endpoint: str, files: dict = None, data: dict = None, verbose: bool = False
+) -> dict:
+    """
+    Async helper function for making API calls.
+    """
+    url = f"{get_api_base_url()}/{endpoint}"
+    try:
+        if verbose:
+            logger.debug(f"Making async API call to {url}")
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, files=files, data=data, timeout=300)
+            response.raise_for_status()
+            return response.json()
     except Exception as e:
         logger.error(f"API call to {endpoint} failed: {e}")
         raise typer.Exit(1)
@@ -62,18 +91,103 @@ def call_api(endpoint: str, files: dict = None, data: dict = None) -> dict:
 # -------------------------
 
 
+async def track_progress(verbose: bool = False):
+    try:
+        # Fix the WebSocket URL path
+        base_url = get_api_base_url().replace("http", "ws")
+        websocket_url = f"{base_url}/denoise/progress"  # Remove /api/v1 from path
+        if verbose:
+            logger.debug(f"Connecting to WebSocket at: {websocket_url}")
+
+        async with websockets.connect(websocket_url) as websocket:
+            if verbose:
+                logger.debug("WebSocket connection established")
+            with typer.progressbar(length=100, label="Denoising") as progress:
+                while True:
+                    try:
+                        message = await websocket.recv()
+                        data = json.loads(message)
+                        if verbose:
+                            logger.debug(f"Received progress update: {data}")
+                        progress.update(data["progress"] - progress.pos)
+                    except websockets.exceptions.ConnectionClosed:
+                        if verbose:
+                            logger.debug("WebSocket disconnected")
+                        break
+                    except Exception as e:
+                        if verbose:
+                            logger.debug(f"WebSocket error: {e}")
+                        break
+    except Exception as e:
+        logger.error(f"Failed to connect to progress WebSocket: {e}")
+        raise
+
+
+async def async_denoise(input_file: Path, verbose: bool = False):
+    try:
+        if verbose:
+            logger.debug("Starting progress tracking")
+
+        # Start progress tracking
+        progress_task = asyncio.create_task(track_progress(verbose))
+
+        # Make async API call
+        with input_file.open("rb") as f:
+            if verbose:
+                logger.debug("Making API call")
+            result = await call_api_async("denoise", files={"file": f}, verbose=verbose)
+
+        # Cancel progress tracking after API call completes
+        if verbose:
+            logger.debug("Completing progress tracking")
+        progress_task.cancel()
+        try:
+            await progress_task
+        except asyncio.CancelledError:
+            if verbose:
+                logger.debug("Progress tracking completed")
+
+        return result
+    except Exception as e:
+        logger.error(f"Error during denoising: {e}")
+        raise typer.Exit(1)
+
+
 @api_app.command("denoise")
-def denoise(input_file: Path, output_file: Path):
+def denoise(
+    input_file: Path,
+    output_file: Path,
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show detailed processing information"
+    ),
+):
     """
     Reduce noise in an audio file using DeepFilterNet.
     """
-    with input_file.open("rb") as f:
-        result = call_api("denoise", files={"file": f})
-    # Expecting a response like {'result': <base64 string>}
-    audio_data = base64.b64decode(result["result"])
-    with output_file.open("wb") as out:
-        out.write(audio_data)
-    typer.echo(f"Denoised audio saved to {output_file}")
+    start_time = time.time()
+
+    if verbose:
+        typer.echo(f"🔈 Input file: {input_file}")
+        typer.echo(f"📏 File size: {input_file.stat().st_size / 1024:.2f} KB")
+        typer.echo("🚀 Starting denoising process...")
+
+    try:
+        result = asyncio.run(async_denoise(input_file, verbose))
+
+        # Process result and save to output file
+        audio_data = base64.b64decode(result["result"])
+        with open(output_file, "wb") as f:
+            f.write(audio_data)
+
+        if verbose:
+            duration = time.time() - start_time
+            typer.echo(f"✨ Processing completed in {duration:.2f}s")
+            typer.echo(f"📊 Metrics: {result.get('metrics', {})}")
+            if result.get("warnings"):
+                typer.echo(f"⚠️  Warnings: {result['warnings']}")
+    except Exception as e:
+        typer.echo(f"❌ Error: {e}", err=True)
+        raise typer.Exit(1)
 
 
 @api_app.command("auto-master")
