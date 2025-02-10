@@ -93,23 +93,36 @@ async def call_api_async(
 
 async def track_progress(verbose: bool = False):
     try:
-        # Fix the WebSocket URL path
         base_url = get_api_base_url().replace("http", "ws")
-        websocket_url = f"{base_url}/denoise/progress"  # Remove /api/v1 from path
+        websocket_url = f"{base_url}/denoise/progress"
         if verbose:
             logger.debug(f"Connecting to WebSocket at: {websocket_url}")
 
-        async with websockets.connect(websocket_url) as websocket:
+        async with websockets.connect(
+            websocket_url,
+            ping_interval=20,  # Send ping every 20 seconds
+            ping_timeout=60,  # Wait up to 60 seconds for pong
+        ) as websocket:
             if verbose:
                 logger.debug("WebSocket connection established")
             with typer.progressbar(length=100, label="Denoising") as progress:
+                last_progress = 0
                 while True:
                     try:
                         message = await websocket.recv()
                         data = json.loads(message)
                         if verbose:
-                            logger.debug(f"Received progress update: {data}")
-                        progress.update(data["progress"] - progress.pos)
+                            logger.debug(f"Received message: {data}")
+
+                        if data.get("type") == "progress":
+                            current_progress = data["progress"]
+                            if current_progress > last_progress:
+                                progress.update(current_progress - last_progress)
+                                last_progress = current_progress
+
+                            if current_progress >= 100:
+                                break
+
                     except websockets.exceptions.ConnectionClosed:
                         if verbose:
                             logger.debug("WebSocket disconnected")
@@ -128,14 +141,20 @@ async def async_denoise(input_file: Path, verbose: bool = False):
         if verbose:
             logger.debug("Starting progress tracking")
 
-        # Start progress tracking
+        # Start progress tracking first
         progress_task = asyncio.create_task(track_progress(verbose))
+
+        # Give the WebSocket connection time to establish
+        await asyncio.sleep(0.5)
 
         # Make async API call
         with input_file.open("rb") as f:
             if verbose:
                 logger.debug("Making API call")
             result = await call_api_async("denoise", files={"file": f}, verbose=verbose)
+
+        # Give time for final progress updates
+        await asyncio.sleep(0.5)
 
         # Cancel progress tracking after API call completes
         if verbose:
