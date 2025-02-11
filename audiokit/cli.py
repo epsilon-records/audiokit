@@ -9,8 +9,8 @@ from typing import Optional
 
 import httpx
 import typer
-import websockets  # Add this with other imports
 from loguru import logger
+from socketio import AsyncClient
 from typer.core import TyperGroup
 
 from audiokit.config import get_api_base_url, load_config, save_config
@@ -201,73 +201,60 @@ def denoise_music(
 
 
 async def track_progress(task_id: str, verbose: bool = False):
-    """Track progress via WebSocket with a progress bar"""
-    try:
-        if verbose:
-            logger.debug("Starting WebSocket progress tracking")
+    """Track progress via Socket.IO with a progress bar"""
+    sio = AsyncClient()
+    progress = typer.progressbar(length=100, label="🔄 Processing", show_pos=True)
+    progress_complete = asyncio.Event()
 
-        # Construct WebSocket URL correctly
-        api_base = get_api_base_url()
-        ws_url = api_base.replace("http://", "ws://").replace("https://", "wss://")
-        ws_url = f"{ws_url}/ws/progress"
+    @sio.on("progress")
+    async def handle_progress(data):
+        nonlocal progress
+        current = min(int(data.get("progress", 0)), 100)
 
-        if verbose:
-            logger.debug(f"Connecting to WebSocket at {ws_url}")
+        if current > progress.pos:
+            update_amount = current - progress.pos
+            progress.update(update_amount)
+            print()  # Newline after progress update
 
-        async with websockets.connect(ws_url) as websocket:
-            # Subscribe to progress updates
-            subscribe_message = {"type": "subscribe", "task_id": task_id}
             if verbose:
-                logger.debug(f"Sending subscribe message: {subscribe_message}")
-            await websocket.send(json.dumps(subscribe_message))
+                logger.debug(f"Progress update: {current}%")
 
-            # Initialize progress bar
-            progress = typer.progressbar(
-                length=100, label="🔄 Processing", show_pos=True
-            )
-            progress.render_progress()
-            print()  # Add initial newline
+            if current >= 100:
+                progress_complete.set()
 
-            last_progress = 0
-            while True:
-                try:
-                    message = await asyncio.wait_for(websocket.recv(), timeout=60.0)
-                    message_data = json.loads(message)
+    @sio.on("connect")
+    async def handle_connect():
+        if verbose:
+            logger.debug("Connected to progress server")
+        await sio.emit("subscribe", {"task_id": task_id})
 
-                    if verbose:
-                        logger.debug(f"Received message: {message_data}")
+    @sio.on("disconnect")
+    async def handle_disconnect():
+        if verbose:
+            logger.debug("Disconnected from progress server")
 
-                    if message_data.get("type") != "progress":
-                        continue
+    try:
+        # Initialize progress bar
+        progress.render_progress()
+        print()
 
-                    current_progress = min(int(message_data["progress"]), 100)
+        await sio.connect(
+            get_api_base_url(), transports=["websocket"], socketio_path="/socket.io"
+        )
 
-                    # Update progress bar
-                    if current_progress > last_progress:
-                        update_amount = current_progress - last_progress
-                        if verbose:
-                            logger.debug(f"Progress update: {current_progress}%")
-                        progress.update(update_amount)
-                        print()  # Add newline after each update
-                        last_progress = current_progress
+        # Wait until progress completes or timeout
+        await asyncio.wait_for(progress_complete.wait(), timeout=3600)  # 1 hour timeout
 
-                    # Exit when complete
-                    if current_progress >= 100:
-                        if verbose:
-                            logger.debug("Progress complete")
-                        progress.update(100 - progress.pos)
-                        progress.render_finish()
-                        print()  # Add final newline
-                        break
-
-                except asyncio.TimeoutError:
-                    if verbose:
-                        logger.debug("WebSocket timeout - waiting for more updates")
-                    continue
-
+    except asyncio.TimeoutError:
+        logger.error("Progress tracking timed out")
+        raise typer.Exit(1)
     except Exception as e:
-        logger.error(f"Failed to track progress: {e}")
+        logger.error(f"Progress tracking failed: {str(e)}")
         raise
+    finally:
+        progress.render_finish()
+        print()
+        await sio.disconnect()
 
 
 async def async_denoise_speech(input_file: Path, verbose: bool = False):

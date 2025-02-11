@@ -22,7 +22,8 @@ dependencies = [
     "plotext>=5.2.8",    # Terminal plotting
     "pyaudio",
     "asyncio",
-    "websockets>=10.0",
+    "python-socketio[asgi]",
+    "aiohttp",
 ]
 
 [project.optional-dependencies]
