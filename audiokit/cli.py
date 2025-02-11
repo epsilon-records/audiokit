@@ -3,18 +3,38 @@ import base64
 import json
 import sys
 import time
+import uuid
 from pathlib import Path
 from typing import Optional
 
 import httpx
 import typer
-import websockets
+import websockets  # Add this with other imports
 from loguru import logger
 from typer.core import TyperGroup
 
 from audiokit.config import get_api_base_url, load_config, save_config
 from audiokit.graph.manager import AudioGraphManager
 from audiokit.nodes import get_available_nodes
+
+# Add this before the main CLI functions
+logger.remove()  # Remove default logger
+logger.add(
+    sys.stderr,
+    level="DEBUG",
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+    "<level>{level.icon} {level}</level> | "
+    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+)
+
+# Add emojis to log levels
+logger.level("INFO", icon="ℹ️")
+logger.level("DEBUG", icon="🐛")
+logger.level("WARNING", icon="⚠️")
+logger.level("ERROR", icon="❌")
+logger.level("CRITICAL", icon="💥")
+logger.level("SUCCESS", icon="✅")
+logger.level("TRACE", icon="🔍")
 
 
 class AliasedGroup(TyperGroup):
@@ -91,89 +111,8 @@ async def call_api_async(
 # -------------------------
 
 
-async def track_progress(verbose: bool = False):
-    try:
-        base_url = get_api_base_url().replace("http", "ws")
-        websocket_url = f"{base_url}/denoise/progress"
-        if verbose:
-            logger.debug(f"Connecting to WebSocket at: {websocket_url}")
-
-        async with websockets.connect(
-            websocket_url,
-            ping_interval=20,  # Send ping every 20 seconds
-            ping_timeout=60,  # Wait up to 60 seconds for pong
-        ) as websocket:
-            if verbose:
-                logger.debug("WebSocket connection established")
-            with typer.progressbar(length=100, label="Denoising") as progress:
-                last_progress = 0
-                while True:
-                    try:
-                        message = await websocket.recv()
-                        data = json.loads(message)
-                        if verbose:
-                            logger.debug(f"Received message: {data}")
-
-                        if data.get("type") == "progress":
-                            current_progress = data["progress"]
-                            if current_progress > last_progress:
-                                progress.update(current_progress - last_progress)
-                                last_progress = current_progress
-
-                            if current_progress >= 100:
-                                break
-
-                    except websockets.exceptions.ConnectionClosed:
-                        if verbose:
-                            logger.debug("WebSocket disconnected")
-                        break
-                    except Exception as e:
-                        if verbose:
-                            logger.debug(f"WebSocket error: {e}")
-                        break
-    except Exception as e:
-        logger.error(f"Failed to connect to progress WebSocket: {e}")
-        raise
-
-
-async def async_denoise(input_file: Path, verbose: bool = False):
-    try:
-        if verbose:
-            logger.debug("Starting progress tracking")
-
-        # Start progress tracking first
-        progress_task = asyncio.create_task(track_progress(verbose))
-
-        # Give the WebSocket connection time to establish
-        await asyncio.sleep(0.5)
-
-        # Make async API call
-        with input_file.open("rb") as f:
-            if verbose:
-                logger.debug("Making API call")
-            result = await call_api_async("denoise", files={"file": f}, verbose=verbose)
-
-        # Give time for final progress updates
-        await asyncio.sleep(0.5)
-
-        # Cancel progress tracking after API call completes
-        if verbose:
-            logger.debug("Completing progress tracking")
-        progress_task.cancel()
-        try:
-            await progress_task
-        except asyncio.CancelledError:
-            if verbose:
-                logger.debug("Progress tracking completed")
-
-        return result
-    except Exception as e:
-        logger.error(f"Error during denoising: {e}")
-        raise typer.Exit(1)
-
-
-@api_app.command("denoise")
-def denoise(
+@api_app.command("denoise-speech")
+def denoise_speech(
     input_file: Path,
     output_file: Path,
     verbose: bool = typer.Option(
@@ -181,31 +120,242 @@ def denoise(
     ),
 ):
     """
-    Reduce noise in an audio file using DeepFilterNet.
+    Reduce noise in speech/vocal audio using DeepFilterNet.
     """
     start_time = time.time()
 
     if verbose:
         typer.echo(f"🔈 Input file: {input_file}")
         typer.echo(f"📏 File size: {input_file.stat().st_size / 1024:.2f} KB")
-        typer.echo("🚀 Starting denoising process...")
+        typer.echo("🚀 Starting speech/vocal denoising process...")
 
     try:
-        result = asyncio.run(async_denoise(input_file, verbose))
+        result = asyncio.run(async_denoise_speech(input_file, verbose))
 
-        # Process result and save to output file
-        audio_data = base64.b64decode(result["result"])
+        # Check if result contains audio data directly
+        if isinstance(result, dict) and "audio" in result:
+            audio_data = base64.b64decode(result["audio"])
+        else:
+            # If the result is already encoded
+            audio_data = base64.b64decode(result)
+
         with open(output_file, "wb") as f:
             f.write(audio_data)
 
         if verbose:
             duration = time.time() - start_time
             typer.echo(f"✨ Processing completed in {duration:.2f}s")
-            typer.echo(f"📊 Metrics: {result.get('metrics', {})}")
-            if result.get("warnings"):
-                typer.echo(f"⚠️  Warnings: {result['warnings']}")
+            if isinstance(result, dict):
+                if "metrics" in result:
+                    typer.echo(f"📊 Metrics: {result['metrics']}")
+                if "warnings" in result:
+                    typer.echo(f"⚠️  Warnings: {result['warnings']}")
     except Exception as e:
         typer.echo(f"❌ Error: {e}", err=True)
+        raise typer.Exit(1)
+
+
+@api_app.command("denoise-music")
+def denoise_music(
+    input_file: Path,
+    output_file: Path,
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show detailed processing information"
+    ),
+):
+    """
+    Denoise music by separating stems, denoising vocals/other, and recombining.
+    Uses Demucs for stem separation and DeepFilterNet for selective denoising.
+    """
+    start_time = time.time()
+
+    if verbose:
+        typer.echo(f"🎵 Input file: {input_file}")
+        typer.echo(f"📏 File size: {input_file.stat().st_size / 1024:.2f} KB")
+        typer.echo("🚀 Starting music denoising process...")
+
+    try:
+        result = asyncio.run(async_denoise_music(input_file, verbose))
+
+        # Check if result contains audio data directly
+        if isinstance(result, dict) and "audio" in result:
+            audio_data = base64.b64decode(result["audio"])
+        else:
+            # If the result is already encoded
+            audio_data = base64.b64decode(result)
+
+        with open(output_file, "wb") as f:
+            f.write(audio_data)
+
+        if verbose:
+            duration = time.time() - start_time
+            typer.echo(f"✨ Processing completed in {duration:.2f}s")
+            if isinstance(result, dict):
+                if "metrics" in result:
+                    typer.echo(f"📊 Metrics: {result['metrics']}")
+                if "warnings" in result:
+                    typer.echo(f"⚠️  Warnings: {result['warnings']}")
+    except Exception as e:
+        typer.echo(f"❌ Error: {e}", err=True)
+        raise typer.Exit(1)
+
+
+async def track_progress(task_id: str, verbose: bool = False):
+    """Track progress via WebSocket with a progress bar"""
+    try:
+        if verbose:
+            logger.debug("Starting WebSocket progress tracking")
+
+        # Construct WebSocket URL correctly
+        api_base = get_api_base_url()
+        ws_url = api_base.replace("http://", "ws://").replace("https://", "wss://")
+        ws_url = f"{ws_url}/ws/progress"
+
+        if verbose:
+            logger.debug(f"Connecting to WebSocket at {ws_url}")
+
+        async with websockets.connect(ws_url) as websocket:
+            # Subscribe to progress updates
+            subscribe_message = {"type": "subscribe", "task_id": task_id}
+            if verbose:
+                logger.debug(f"Sending subscribe message: {subscribe_message}")
+            await websocket.send(json.dumps(subscribe_message))
+
+            # Initialize progress bar
+            progress = typer.progressbar(
+                length=100, label="🔄 Processing", show_pos=True
+            )
+            progress.render_progress()
+            print()  # Add initial newline
+
+            last_progress = 0
+            while True:
+                try:
+                    message = await asyncio.wait_for(websocket.recv(), timeout=60.0)
+                    message_data = json.loads(message)
+
+                    if verbose:
+                        logger.debug(f"Received message: {message_data}")
+
+                    if message_data.get("type") != "progress":
+                        continue
+
+                    current_progress = min(int(message_data["progress"]), 100)
+
+                    # Update progress bar
+                    if current_progress > last_progress:
+                        update_amount = current_progress - last_progress
+                        if verbose:
+                            logger.debug(f"Progress update: {current_progress}%")
+                        progress.update(update_amount)
+                        print()  # Add newline after each update
+                        last_progress = current_progress
+
+                    # Exit when complete
+                    if current_progress >= 100:
+                        if verbose:
+                            logger.debug("Progress complete")
+                        progress.update(100 - progress.pos)
+                        progress.render_finish()
+                        print()  # Add final newline
+                        break
+
+                except asyncio.TimeoutError:
+                    if verbose:
+                        logger.debug("WebSocket timeout - waiting for more updates")
+                    continue
+
+    except Exception as e:
+        logger.error(f"Failed to track progress: {e}")
+        raise
+
+
+async def async_denoise_speech(input_file: Path, verbose: bool = False):
+    """Async helper for speech/vocal denoising with progress bar"""
+    try:
+        if verbose:
+            logger.debug("Starting denoising process")
+
+        with input_file.open("rb") as f:
+            if verbose:
+                logger.debug("Making API call")
+
+            task_id = str(uuid.uuid4())
+
+            if verbose:
+                logger.debug(f"Using task ID: {task_id}")
+
+            api_task = asyncio.create_task(
+                call_api_async(
+                    "denoise_speech",
+                    files={"file": f},
+                    data={"task_id": task_id},
+                    verbose=verbose,
+                )
+            )
+
+            progress_task = asyncio.create_task(track_progress(task_id, verbose))
+
+            # Wait for both tasks to complete
+            await asyncio.gather(api_task, progress_task)
+
+            result = api_task.result()
+            if "error" in result:
+                raise Exception(result["error"])
+
+            if not isinstance(result, dict) or "result" not in result:
+                raise Exception("Invalid response format from API")
+
+            return result["result"]  # Return the base64-encoded audio data
+
+    except Exception as e:
+        logger.error(f"Error during speech/vocal denoising: {e}")
+        raise typer.Exit(1)
+
+
+async def async_denoise_music(input_file: Path, verbose: bool = False):
+    """Async helper for music denoising with progress bar"""
+    try:
+        if verbose:
+            logger.debug("Starting music denoising")
+
+        with input_file.open("rb") as f:
+            if verbose:
+                logger.debug("Making API call")
+
+            task_id = str(uuid.uuid4())
+
+            if verbose:
+                logger.debug(f"Using task ID: {task_id}")
+
+            api_task = asyncio.create_task(
+                call_api_async(
+                    "denoise_music",
+                    files={"file": f},
+                    data={"task_id": task_id},
+                    verbose=verbose,
+                )
+            )
+
+            progress_task = asyncio.create_task(track_progress(task_id, verbose))
+
+            await asyncio.gather(api_task, progress_task)
+
+            result = api_task.result()
+            if "error" in result:
+                raise Exception(result["error"])
+
+            # Extract the base64 audio data from the result
+            if isinstance(result, dict):
+                if "result" in result:
+                    return result["result"]  # Return just the base64 string
+                elif "audio" in result:
+                    return result["audio"]  # Alternative key name
+
+            raise Exception("Invalid response format from API")
+
+    except Exception as e:
+        logger.error(f"Error during music denoising: {e}")
         raise typer.Exit(1)
 
 
